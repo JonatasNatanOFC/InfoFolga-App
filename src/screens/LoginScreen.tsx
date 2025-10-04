@@ -69,30 +69,38 @@ const LoginScreen: React.FC<Props> = ({ navigation }) => {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Controle de Folgas</Text>
+      <View style={styles.loginBox}>
+        <Text style={styles.title}>Controle de Folgas</Text>
 
-      <TextInput
-        style={styles.input}
-        placeholder="Matrícula"
-        value={matricula}
-        onChangeText={setMatricula}
-        keyboardType="numeric"
-        editable={!isLoading} // Não deixa editar enquanto carrega
-      />
-      <TextInput
-        style={styles.input}
-        placeholder="Senha"
-        secureTextEntry
-        value={senha}
-        onChangeText={setSenha}
-        editable={!isLoading}
-      />
+        <TextInput
+          style={styles.input}
+          placeholder="Matrícula"
+          value={matricula}
+          onChangeText={setMatricula}
+          keyboardType="numeric"
+          editable={!isLoading} // Não deixa editar enquanto carrega
+        />
+        <TextInput
+          style={styles.input}
+          placeholder="Senha"
+          secureTextEntry
+          value={senha}
+          onChangeText={setSenha}
+          editable={!isLoading}
+        />
 
-      {isLoading ? (
-        <ActivityIndicator size="large" color="#0000ff" />
-      ) : (
-        <Button title="Entrar" onPress={handleLogin} />
-      )}
+        {isLoading ? (
+          <ActivityIndicator size="large" color="#005693" />
+        ) : (
+          <View style={styles.buttonLogin}>
+            <Button
+              title="Entrar"
+              onPress={handleLogin}
+              color="#fff" // Use color prop to set the button's color
+            />
+          </View>
+        )}
+      </View>
     </View>
   );
 };
@@ -102,6 +110,8 @@ interface Style {
   container: ViewStyle;
   title: TextStyle;
   input: TextStyle;
+  loginBox: ViewStyle;
+  buttonLogin?: ViewStyle;
 }
 
 const styles = StyleSheet.create<Style>({
@@ -116,7 +126,7 @@ const styles = StyleSheet.create<Style>({
     fontWeight: "bold",
     textAlign: "center",
     marginBottom: 30,
-    color: "#333",
+    color: "#005693",
   },
   input: {
     height: 50,
@@ -127,6 +137,21 @@ const styles = StyleSheet.create<Style>({
     paddingHorizontal: 15,
     backgroundColor: "#fff",
     fontSize: 16,
+  },
+  loginBox: {
+    backgroundColor: "#fff",
+    padding: 20,
+    borderRadius: 10,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 5,
+  },
+  buttonLogin: {
+    marginTop: 10,
+    backgroundColor: "#005693",
+    borderRadius: 8,
   },
 });
 
