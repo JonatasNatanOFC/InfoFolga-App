@@ -30,7 +30,7 @@ const LoginScreen: React.FC<AuthScreenProps<"Login">> = ({ navigation }) => {
     if (!matricula || !senha) {
       Alert.alert(
         "Atenção",
-        "Por favor, preencha os campos de matrícula e senha."
+        "Por favor, preencha os campos de matrícula e senha.",
       );
       return;
     }
@@ -39,15 +39,14 @@ const LoginScreen: React.FC<AuthScreenProps<"Login">> = ({ navigation }) => {
       const loginData: LoginRequest = { matricula, senha };
       const response = await api.post<LoginResponse>(
         "/api/auth/login",
-        loginData
+        loginData,
       );
       const { token, nomeUsuario, role } = response.data;
-      console.log(response);
 
       if (!token) {
         Alert.alert(
           "Erro de Login",
-          "A resposta do servidor não incluiu um token."
+          "A resposta do servidor não incluiu um token.",
         );
         setIsLoading(false);
         return;

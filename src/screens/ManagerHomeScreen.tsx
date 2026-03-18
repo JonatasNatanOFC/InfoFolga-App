@@ -1,4 +1,3 @@
-// src/screens/ManagerHomeScreen.tsx
 import React, { useState, useEffect } from "react";
 import {
   View,
@@ -9,7 +8,9 @@ import {
   ActivityIndicator,
   Alert,
 } from "react-native";
-import { Ionicons } from "@expo/vector-icons";
+import { LinearGradient } from "expo-linear-gradient";
+import { StatusBar } from "expo-status-bar";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import DashboardStatCard from "../components/DashboardStatCard";
 import QuickActionButton from "../components/QuickActionButton";
 import api from "../services/api";
@@ -29,6 +30,7 @@ interface UserData {
 const ManagerHomeScreen: React.FC<ManagerTabScreenProps<"Inicio">> = ({
   navigation,
 }) => {
+  const insets = useSafeAreaInsets();
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [userName, setUserName] = useState("A carregar...");
 
@@ -54,14 +56,10 @@ const ManagerHomeScreen: React.FC<ManagerTabScreenProps<"Inicio">> = ({
 
   const handleLogout = async () => {
     await AsyncStorage.removeItem("userToken");
-    // A melhor forma de navegar para o login a partir de um navegador aninhado
-    navigation
-      .getParent()
-      ?.getParent()
-      ?.reset({
-        index: 0,
-        routes: [{ name: "Auth" }],
-      });
+    navigation.getParent()?.reset({
+      index: 0,
+      routes: [{ name: "Auth" }],
+    });
   };
 
   if (!stats) {
@@ -73,98 +71,130 @@ const ManagerHomeScreen: React.FC<ManagerTabScreenProps<"Inicio">> = ({
   }
 
   return (
-    <ScrollView style={styles.container}>
-      <View style={styles.header}>
-        <View>
-          <Text style={styles.headerTitle}>Controle de Folgas</Text>
-          <Text style={styles.headerSubtitle}>{userName} • Gerente</Text>
+    <View style={styles.container}>
+      <StatusBar style="light" />
+
+      {/* Header com degradê cobrindo a status bar */}
+      <LinearGradient
+        colors={["#007bff", "#0056b3"]}
+        style={[styles.headerGradient, { paddingTop: insets.top }]}
+      >
+        <View style={styles.headerContent}>
+          <View>
+            <Text style={styles.headerTitle}>Controle de Folgas</Text>
+            <Text style={styles.headerSubtitle}>{userName} • Gerente</Text>
+          </View>
+          <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
+            <Text style={styles.logoutButtonText}>Sair</Text>
+          </TouchableOpacity>
         </View>
-        <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
-          <Text style={styles.logoutButtonText}>Sair</Text>
-        </TouchableOpacity>
-      </View>
-      <View style={styles.section}>
-        <View style={styles.welcomePanel}>
-          <Text style={styles.welcomeTitle}>Painel Gerencial</Text>
-          <Text style={styles.welcomeText}>Bem-vindo, {userName}</Text>
+      </LinearGradient>
+
+      <ScrollView>
+        <View style={styles.section}>
+          <DashboardStatCard
+            icon="hourglass-outline"
+            label="Solicitações Pendentes"
+            value={stats.pendingRequests}
+            color="#ffc107"
+          />
+          <DashboardStatCard
+            icon="people-outline"
+            label="Total de Funcionários"
+            value={stats.totalEmployees}
+            color="#17a2b8"
+          />
+          <DashboardStatCard
+            icon="calendar-outline"
+            label="Total de Solicitações"
+            value={stats.totalRequests}
+            color="#28a745"
+          />
         </View>
-      </View>
-      <View style={styles.section}>
-        <DashboardStatCard
-          icon="hourglass-outline"
-          label="Solicitações Pendentes"
-          value={stats.pendingRequests}
-          color="#ffc107"
-        />
-        <DashboardStatCard
-          icon="people-outline"
-          label="Total de Funcionários"
-          value={stats.totalEmployees}
-          color="#17a2b8"
-        />
-        <DashboardStatCard
-          icon="calendar-outline"
-          label="Total de Solicitações"
-          value={stats.totalRequests}
-          color="#28a745"
-        />
-      </View>
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Ações Rápidas</Text>
-        <QuickActionButton
-          icon="clipboard-outline"
-          label="Revisar Solicitações"
-          onPress={() => navigation.navigate("Solicitacoes")}
-          color="#ffc107"
-        />
-        <QuickActionButton
-          icon="person-add-outline"
-          label="Gerenciar Funcionários"
-          onPress={() => navigation.navigate("Funcionarios")}
-          color="#17a2b8"
-        />
-        <QuickActionButton
-          icon="analytics-outline"
-          label="Ver Relatórios"
-          onPress={() => navigation.navigate("Relatorios")}
-          color="#28a745"
-        />
-      </View>
-    </ScrollView>
+
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Ações Rápidas</Text>
+          <QuickActionButton
+            icon="clipboard-outline"
+            label="Revisar Solicitações"
+            onPress={() => navigation.navigate("Solicitacoes")}
+            color="#ffc107"
+          />
+          <QuickActionButton
+            icon="person-add-outline"
+            label="Gerenciar Funcionários"
+            onPress={() => navigation.navigate("Funcionarios")}
+            color="#17a2b8"
+          />
+          <QuickActionButton
+            icon="analytics-outline"
+            label="Ver Relatórios"
+            onPress={() => navigation.navigate("Relatorios")}
+            color="#28a745"
+          />
+        </View>
+      </ScrollView>
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#f0f2f5" },
+  container: {
+    flex: 1,
+    backgroundColor: "#f0f2f5",
+  },
   loadingContainer: {
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
     backgroundColor: "#f0f2f5",
   },
-  header: {
-    paddingTop: 50,
+  headerGradient: {
     paddingHorizontal: 20,
     paddingBottom: 16,
-    backgroundColor: "#fff",
+  },
+  headerContent: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    borderBottomWidth: 1,
-    borderBottomColor: "#eee",
+    paddingTop: 10,
   },
-  headerTitle: { fontSize: 14, color: "#666" },
-  headerSubtitle: { fontSize: 18, fontWeight: "bold", color: "#111" },
+  headerTitle: {
+    fontSize: 14,
+    color: "rgba(255,255,255,0.8)",
+  },
+  headerSubtitle: {
+    fontSize: 18,
+    fontWeight: "bold",
+    color: "#fff",
+  },
   logoutButton: {
-    backgroundColor: "#dc3545",
+    backgroundColor: "rgba(255,255,255,0.2)",
     paddingHorizontal: 20,
     paddingVertical: 8,
     borderRadius: 20,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.4)",
   },
-  logoutButtonText: { color: "#fff", fontWeight: "bold" },
-  section: { paddingHorizontal: 20, marginBottom: 10 },
-  welcomePanel: { backgroundColor: "#007bff", borderRadius: 12, padding: 20 },
-  welcomeTitle: { fontSize: 16, color: "#fff", opacity: 0.8 },
+  logoutButtonText: {
+    color: "#fff",
+    fontWeight: "bold",
+  },
+  section: {
+    paddingHorizontal: 20,
+    marginBottom: 10,
+    marginTop: 18,
+  },
+  welcomePanel: {
+    backgroundColor: "#007bff",
+    borderRadius: 12,
+    padding: 20,
+  },
+  welcomeTitle: {
+    fontSize: 16,
+    color: "#fff",
+    opacity: 0.8,
+  },
   welcomeText: {
     fontSize: 20,
     color: "#fff",
