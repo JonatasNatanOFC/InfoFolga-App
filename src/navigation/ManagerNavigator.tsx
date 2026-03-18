@@ -10,8 +10,8 @@ import {
   KeyboardAvoidingView,
   Platform,
 } from "react-native";
-import { AuthScreenProps } from "./src/navigation/types";
-import api, { LoginRequest } from "./src/services/api";
+import { AuthScreenProps } from "../navigation/types";
+import api, { LoginRequest } from "../services/api";
 import { Ionicons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
@@ -30,7 +30,7 @@ const LoginScreen: React.FC<AuthScreenProps<"Login">> = ({ navigation }) => {
     if (!matricula || !senha) {
       Alert.alert(
         "Atenção",
-        "Por favor, preencha os campos de matrícula e senha."
+        "Por favor, preencha os campos de matrícula e senha.",
       );
       return;
     }
@@ -39,7 +39,7 @@ const LoginScreen: React.FC<AuthScreenProps<"Login">> = ({ navigation }) => {
       const loginData: LoginRequest = { matricula, senha };
       const response = await api.post<LoginResponse>(
         "/api/auth/login",
-        loginData
+        loginData,
       );
       const { token, nomeUsuario, role } = response.data;
       console.log(response);
@@ -47,7 +47,7 @@ const LoginScreen: React.FC<AuthScreenProps<"Login">> = ({ navigation }) => {
       if (!token) {
         Alert.alert(
           "Erro de Login",
-          "A resposta do servidor não incluiu um token."
+          "A resposta do servidor não incluiu um token.",
         );
         setIsLoading(false);
         return;

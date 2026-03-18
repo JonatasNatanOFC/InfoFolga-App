@@ -3,24 +3,28 @@ import {
   View,
   Text,
   TextInput,
-  Button,
   StyleSheet,
   Alert,
-  ActivityIndicator, // Componente para o feedback de "carregando"
-  ViewStyle,
-  TextStyle,
+  ActivityIndicator,
+  TouchableOpacity,
+  KeyboardAvoidingView,
+  Platform,
 } from "react-native";
-import { StackScreenProps } from "@react-navigation/stack";
-import { RootStackParamList } from "../navigation/AppNavigator";
-import api, { LoginRequest, LoginResponse } from "../services/api";
+import { AuthScreenProps } from "../navigation/types";
+import api, { LoginRequest } from "../services/api";
+import { Ionicons } from "@expo/vector-icons";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
-// Tipagem para as propriedades de navegação da tela de Login
-type Props = StackScreenProps<RootStackParamList, "Login">;
+interface LoginResponse {
+  token: string;
+  nomeUsuario: string;
+  role: "ROLE_GERENTE" | "ROLE_FUNCIONARIO";
+}
 
-const LoginScreen: React.FC<Props> = ({ navigation }) => {
+const LoginScreen: React.FC<AuthScreenProps<"Login">> = ({ navigation }) => {
   const [matricula, setMatricula] = useState<string>("");
   const [senha, setSenha] = useState<string>("");
-  const [isLoading, setIsLoading] = useState<boolean>(false); // Estado de carregamento
+  const [isLoading, setIsLoading] = useState<boolean>(false);
 
   const handleLogin = async () => {
     if (!matricula || !senha) {
@@ -30,55 +34,69 @@ const LoginScreen: React.FC<Props> = ({ navigation }) => {
       );
       return;
     }
-
-    setIsLoading(true); // Inicia o carregamento
-
+    setIsLoading(true);
     try {
       const loginData: LoginRequest = { matricula, senha };
-
       const response = await api.post<LoginResponse>(
         "/api/auth/login",
         loginData
       );
+      const { token, nomeUsuario, role } = response.data;
+      console.log(response);
 
-      const { token, nomeUsuario } = response.data;
-
-      // Sucesso!
-      console.log(`Login bem-sucedido. Token: ${token}`);
-
-      // Navega para a tela Home, substituindo a tela de Login na pilha
-      // para que o usuário não possa voltar para ela apertando o botão "voltar".
-      navigation.replace("Home", { nomeUsuario });
-    } catch (error: any) {
-      console.error("Falha no login:", error);
-
-      let errorMessage =
-        "Não foi possível conectar ao servidor. Tente novamente.";
-      if (
-        error.response &&
-        (error.response.status === 401 || error.response.status === 403)
-      ) {
-        errorMessage = "Matrícula ou senha inválida.";
+      if (!token) {
+        Alert.alert(
+          "Erro de Login",
+          "A resposta do servidor não incluiu um token."
+        );
+        setIsLoading(false);
+        return;
       }
 
+      await AsyncStorage.setItem("userToken", token);
+
+      if (role === "ROLE_GERENTE") {
+        navigation.replace("ManagerApp", { screen: "Inicio" });
+      } else {
+        navigation.replace("EmployeeApp", {
+          screen: "Home",
+          params: { nomeUsuario },
+        });
+      }
+    } catch (error: any) {
+      console.error("Falha no login:", error);
+      let errorMessage = "Não foi possível conectar ao servidor.";
+      if (error.isAxiosError && error.response) {
+        errorMessage = `Erro do servidor: ${error.response.status}. Matrícula ou senha inválida.`;
+      } else if (error.isAxiosError && error.request) {
+        errorMessage =
+          "Erro de rede. Verifique sua conexão e se o servidor backend está rodando.";
+      }
       Alert.alert("Erro no Login", errorMessage);
     } finally {
-      setIsLoading(false); // Finaliza o carregamento, independentemente de sucesso ou erro
+      setIsLoading(false);
     }
   };
 
   return (
-    <View style={styles.container}>
-      <View style={styles.loginBox}>
+    <KeyboardAvoidingView
+      behavior={Platform.OS === "ios" ? "padding" : "height"}
+      style={styles.container}
+    >
+      <View style={styles.header}>
+        <Ionicons name="briefcase-outline" size={60} color="#007bff" />
         <Text style={styles.title}>Controle de Folgas</Text>
-
+        <Text style={styles.subtitle}>Faça login para continuar</Text>
+      </View>
+      <View style={styles.form}>
         <TextInput
           style={styles.input}
           placeholder="Matrícula"
           value={matricula}
           onChangeText={setMatricula}
           keyboardType="numeric"
-          editable={!isLoading} // Não deixa editar enquanto carrega
+          editable={!isLoading}
+          placeholderTextColor="#888"
         />
         <TextInput
           style={styles.input}
@@ -87,72 +105,54 @@ const LoginScreen: React.FC<Props> = ({ navigation }) => {
           value={senha}
           onChangeText={setSenha}
           editable={!isLoading}
+          placeholderTextColor="#888"
         />
-
         {isLoading ? (
-          <ActivityIndicator size="large" color="#005693" />
+          <ActivityIndicator
+            size="large"
+            color="#007bff"
+            style={{ marginTop: 20 }}
+          />
         ) : (
-          <View style={styles.buttonLogin}>
-            <Button
-              title="Entrar"
-              onPress={handleLogin}
-              color="#fff" // Use color prop to set the button's color
-            />
-          </View>
+          <TouchableOpacity style={styles.button} onPress={handleLogin}>
+            <Text style={styles.buttonText}>Entrar</Text>
+          </TouchableOpacity>
         )}
       </View>
-    </View>
+    </KeyboardAvoidingView>
   );
 };
 
-// Estilos
-interface Style {
-  container: ViewStyle;
-  title: TextStyle;
-  input: TextStyle;
-  loginBox: ViewStyle;
-  buttonLogin?: ViewStyle;
-}
-
-const styles = StyleSheet.create<Style>({
+const styles = StyleSheet.create({
   container: {
     flex: 1,
     justifyContent: "center",
-    padding: 20,
-    backgroundColor: "#f5f5f5",
+    backgroundColor: "#f0f2f5",
+    paddingHorizontal: 20,
   },
-  title: {
-    fontSize: 28,
-    fontWeight: "bold",
-    textAlign: "center",
-    marginBottom: 30,
-    color: "#005693",
-  },
+  header: { alignItems: "center", marginBottom: 40 },
+  title: { fontSize: 28, fontWeight: "bold", color: "#333", marginTop: 10 },
+  subtitle: { fontSize: 16, color: "#666", marginTop: 4 },
+  form: { width: "100%" },
   input: {
     height: 50,
+    backgroundColor: "#fff",
     borderColor: "#ddd",
     borderWidth: 1,
     borderRadius: 8,
     marginBottom: 15,
     paddingHorizontal: 15,
-    backgroundColor: "#fff",
     fontSize: 16,
+    color: "#333",
   },
-  loginBox: {
-    backgroundColor: "#fff",
-    padding: 20,
-    borderRadius: 10,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 5,
-  },
-  buttonLogin: {
-    marginTop: 10,
-    backgroundColor: "#005693",
+  button: {
+    backgroundColor: "#007bff",
+    paddingVertical: 15,
     borderRadius: 8,
+    alignItems: "center",
+    marginTop: 10,
   },
+  buttonText: { color: "#fff", fontSize: 18, fontWeight: "bold" },
 });
 
 export default LoginScreen;
