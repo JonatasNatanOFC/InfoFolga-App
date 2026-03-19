@@ -14,6 +14,7 @@ import { AuthScreenProps } from "../navigation/types";
 import api, { LoginRequest } from "../services/api";
 import { Ionicons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { StatusBar } from "expo-status-bar";
 
 interface LoginResponse {
   token: string;
@@ -82,6 +83,7 @@ const LoginScreen: React.FC<AuthScreenProps<"Login">> = ({ navigation }) => {
       behavior={Platform.OS === "ios" ? "padding" : "height"}
       style={styles.container}
     >
+      <StatusBar style="auto" />
       <View style={styles.header}>
         <Ionicons name="briefcase-outline" size={60} color="#007bff" />
         <Text style={styles.title}>Controle de Folgas</Text>

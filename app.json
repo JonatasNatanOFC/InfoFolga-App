@@ -28,7 +28,14 @@
     },
     "plugins": [
       "expo-font",
-      "expo-secure-store"
+      "expo-secure-store",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Permitir acesso a galeria para adicionar foto do funcionario",
+          "cameraPermission": "Permitir acesso a camera para tirar foto do funcionario"
+        }
+      ]
     ]
   }
 }

@@ -8,19 +8,21 @@ import {
   ActivityIndicator,
   Alert,
 } from "react-native";
-import { LinearGradient } from "expo-linear-gradient";
 import { StatusBar } from "expo-status-bar";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import DashboardStatCard from "../components/DashboardStatCard";
+import AppHeader from "../components/AppHeader";
 import QuickActionButton from "../components/QuickActionButton";
 import api from "../services/api";
 import { ManagerTabScreenProps } from "../navigation/types";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { LinearGradient } from "expo-linear-gradient";
 
 interface DashboardStats {
   pendingRequests: number;
   totalEmployees: number;
-  totalRequests: number;
+  approvedLast30Days: number;
+  rejectedLast30Days: number;
 }
 
 interface UserData {
@@ -45,7 +47,7 @@ const ManagerHomeScreen: React.FC<ManagerTabScreenProps<"Inicio">> = ({
     } catch (error) {
       console.error("Erro ao carregar dados iniciais:", error);
       Alert.alert("Erro", "Não foi possível carregar os dados do painel.");
-      setStats({ pendingRequests: 0, totalEmployees: 0, totalRequests: 0 });
+      setStats({ pendingRequests: 0, totalEmployees: 0, approvedLast30Days: 0, rejectedLast30Days: 0 });
       setUserName("Gerente");
     }
   };
@@ -74,22 +76,7 @@ const ManagerHomeScreen: React.FC<ManagerTabScreenProps<"Inicio">> = ({
     <View style={styles.container}>
       <StatusBar style="light" />
 
-      {/* Header com degradê cobrindo a status bar */}
-      <LinearGradient
-        colors={["#007bff", "#0056b3"]}
-        style={[styles.headerGradient, { paddingTop: insets.top }]}
-      >
-        <View style={styles.headerContent}>
-          <View>
-            <Text style={styles.headerTitle}>Controle de Folgas</Text>
-            <Text style={styles.headerSubtitle}>{userName} • Gerente</Text>
-          </View>
-          <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
-            <Text style={styles.logoutButtonText}>Sair</Text>
-          </TouchableOpacity>
-        </View>
-      </LinearGradient>
-
+      <AppHeader subtitle={userName + " • Gerente"} onLogout={handleLogout} />
       <ScrollView>
         <View style={styles.section}>
           <DashboardStatCard
@@ -104,12 +91,26 @@ const ManagerHomeScreen: React.FC<ManagerTabScreenProps<"Inicio">> = ({
             value={stats.totalEmployees}
             color="#17a2b8"
           />
-          <DashboardStatCard
-            icon="calendar-outline"
-            label="Total de Solicitações"
-            value={stats.totalRequests}
-            color="#28a745"
-          />
+          <View style={{ flexDirection: "row", gap: 10 }}>
+            <View style={{ flex: 1 }}>
+              <DashboardStatCard
+                compact
+                icon="checkmark-circle-outline"
+                label="Aprovadas (30d)"
+                value={stats.approvedLast30Days}
+                color="#28a745"
+              />
+            </View>
+            <View style={{ flex: 1 }}>
+              <DashboardStatCard
+                compact
+                icon="close-circle-outline"
+                label="Rejeitadas (30d)"
+                value={stats.rejectedLast30Days}
+                color="#dc3545"
+              />
+            </View>
+          </View>
         </View>
 
         <View style={styles.section}>
@@ -123,7 +124,7 @@ const ManagerHomeScreen: React.FC<ManagerTabScreenProps<"Inicio">> = ({
           <QuickActionButton
             icon="person-add-outline"
             label="Gerenciar Funcionários"
-            onPress={() => navigation.navigate("Funcionarios")}
+            onPress={() => navigation.jumpTo("Funcionarios", { screen: "FuncionariosList" })}
             color="#17a2b8"
           />
           <QuickActionButton

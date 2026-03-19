@@ -7,17 +7,18 @@ interface Props {
   label: string;
   value: number | string;
   color: string;
+  compact?: boolean;
 }
 
-const DashboardStatCard: React.FC<Props> = ({ icon, label, value, color }) => {
+const DashboardStatCard: React.FC<Props> = ({ icon, label, value, color, compact }) => {
   return (
-    <View style={styles.card}>
-      <View style={[styles.iconContainer, { backgroundColor: `${color}20` }]}>
-        <Ionicons name={icon} size={24} color={color} />
+    <View style={[styles.card, compact && styles.cardCompact]}>
+      <View style={[styles.iconContainer, { backgroundColor: color + "20" }, compact && styles.iconCompact]}>
+        <Ionicons name={icon} size={compact ? 18 : 24} color={color} />
       </View>
       <View style={styles.textContainer}>
-        <Text style={styles.value}>{value}</Text>
-        <Text style={styles.label}>{label}</Text>
+        <Text style={[styles.value, compact && styles.valueCompact]}>{value}</Text>
+        <Text style={[styles.label, compact && styles.labelCompact]} numberOfLines={2}>{label}</Text>
       </View>
     </View>
   );
@@ -37,10 +38,16 @@ const styles = StyleSheet.create({
     shadowRadius: 3,
     elevation: 3,
   },
+  cardCompact: {
+    padding: 12,
+  },
   iconContainer: { padding: 12, borderRadius: 8 },
-  textContainer: { marginLeft: 16 },
+  iconCompact: { padding: 8 },
+  textContainer: { marginLeft: 10, flex: 1 },
   value: { fontSize: 22, fontWeight: "bold", color: "#111" },
-  label: { fontSize: 14, color: "#666" },
+  valueCompact: { fontSize: 18 },
+  label: { fontSize: 13, color: "#666" },
+  labelCompact: { fontSize: 11, color: "#666" },
 });
 
 export default DashboardStatCard;

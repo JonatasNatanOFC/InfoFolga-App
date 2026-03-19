@@ -3,6 +3,9 @@ import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { Ionicons } from "@expo/vector-icons";
 import { ManagerTabParamList } from "./types";
 import ManagerHomeScreen from "../screens/ManagerHomeScreen";
+import FuncionariosNavigator from "./FuncionariosNavigator";
+import ManagerSolicitacoesScreen from "../screens/ManagerSolicitacoesScreen";
+import ManagerRelatoriosScreen from "../screens/ManagerRelatoriosScreen";
 
 const ManagerTab = createBottomTabNavigator<ManagerTabParamList>();
 
@@ -27,6 +30,21 @@ const ManagerNavigator = () => (
     })}
   >
     <ManagerTab.Screen name="Inicio" component={ManagerHomeScreen} />
+    <ManagerTab.Screen
+      name="Solicitacoes"
+      component={ManagerSolicitacoesScreen}
+      options={{ tabBarLabel: "Solicitações" }}
+    />
+    <ManagerTab.Screen
+      name="Funcionarios"
+      component={FuncionariosNavigator}
+      options={{ tabBarLabel: "Funcionários" }}
+    />
+    <ManagerTab.Screen
+      name="Relatorios"
+      component={ManagerRelatoriosScreen}
+      options={{ tabBarLabel: "Relatórios" }}
+    />
   </ManagerTab.Navigator>
 );
 

@@ -9,12 +9,23 @@ export type AuthStackParamList = {
   Login: undefined;
 };
 
+export type FuncionariosStackParamList = {
+  FuncionariosList: undefined;
+  FuncionarioDetalhes: { funcionarioId: number };
+};
+
 export type ManagerTabParamList = {
   Inicio: undefined;
   Solicitacoes: undefined;
-  Funcionarios: undefined;
+  Funcionarios: NavigatorScreenParams<FuncionariosStackParamList>;
   Relatorios: undefined;
 };
+
+export type FuncionariosStackScreenProps<T extends keyof FuncionariosStackParamList> =
+  CompositeScreenProps
+    StackScreenProps<FuncionariosStackParamList, T>,
+    ManagerTabScreenProps<"Funcionarios">
+  >;
 
 export type EmployeeTabParamList = {
   Home: { nomeUsuario: string };
