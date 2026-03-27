@@ -22,10 +22,10 @@ export type ManagerTabParamList = {
 };
 
 export type FuncionariosStackScreenProps<T extends keyof FuncionariosStackParamList> =
-  CompositeScreenProps
-    StackScreenProps<FuncionariosStackParamList, T>,
-    ManagerTabScreenProps<"Funcionarios">
-  >;
+    CompositeScreenProps<
+      StackScreenProps<FuncionariosStackParamList, T>,
+      ManagerTabScreenProps<"Funcionarios">
+    >;
 
 export type EmployeeTabParamList = {
   Home: { nomeUsuario: string };

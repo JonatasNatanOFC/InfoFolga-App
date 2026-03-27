@@ -14,12 +14,10 @@ import {
   KeyboardAvoidingView,
   Platform,
 } from "react-native";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
 import AppHeader from "../components/AppHeader";
 import api from "../services/api";
-import { ManagerTabScreenProps } from "../navigation/types";
 
 interface Funcionario {
   id: number;
@@ -61,15 +59,35 @@ const EMPTY_FORM: FuncionarioForm = {
   status: "ativo",
 };
 
+const addFields = [
+  { key: "nome", label: "Nome *", placeholder: "Nome completo", secure: false },
+  {
+    key: "matricula",
+    label: "Matricula *",
+    placeholder: "Ex: 00123",
+    secure: false,
+  },
+  {
+    key: "cargo",
+    label: "Cargo *",
+    placeholder: "Ex: Analista",
+    secure: false,
+  },
+  { key: "setor", label: "Setor", placeholder: "Ex: TI", secure: false },
+  { key: "cpf", label: "CPF", placeholder: "000.000.000-00", secure: false },
+  {
+    key: "senha",
+    label: "Senha *",
+    placeholder: "Senha inicial",
+    secure: true,
+  },
+];
+
 function ManagerFuncionariosScreen(props: any): React.ReactElement {
-  const insets = useSafeAreaInsets();
   const [funcionarios, setFuncionarios] = useState<Funcionario[]>([]);
   const [loading, setLoading] = useState(true);
   const [modalVisible, setModalVisible] = useState(false);
-  const [editModalVisible, setEditModalVisible] = useState(false);
-  const [selectedId, setSelectedId] = useState<number | null>(null);
   const [form, setForm] = useState<FuncionarioForm>(EMPTY_FORM);
-  const [editForm, setEditForm] = useState<FuncionarioForm>(EMPTY_FORM);
   const [saving, setSaving] = useState(false);
 
   const loadFuncionarios = async () => {
@@ -158,239 +176,27 @@ function ManagerFuncionariosScreen(props: any): React.ReactElement {
     }
   };
 
-  const handleEditar = (item: Funcionario) => {
-    setSelectedId(item.id);
-    setEditForm({
-      nome: item.nome,
-      matricula: item.matricula,
-      cargo: item.cargo,
-      setor: item.setor ?? "",
-      cpf: item.cpf ?? "",
-      senha: "",
-      foto: item.foto,
-      status: item.status,
-    });
-    setEditModalVisible(true);
-  };
-
-  const handleSalvarEdicao = async () => {
-    if (!editForm.nome || !editForm.matricula || !editForm.cargo) {
-      Alert.alert("Erro", "Preencha os campos obrigatorios.");
-      return;
-    }
-    setSaving(true);
-    try {
-      await api.put("/api/gerencia/funcionarios/" + selectedId, editForm);
-      setEditModalVisible(false);
-      loadFuncionarios();
-    } catch {
-      Alert.alert("Erro", "Nao foi possivel atualizar o funcionario.");
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const handleRemover = (item: Funcionario) => {
-    Alert.alert("Remover", "Deseja remover " + item.nome + "?", [
-      { text: "Cancelar", style: "cancel" },
-      {
-        text: "Remover",
-        style: "destructive",
-        onPress: async () => {
-          try {
-            await api.delete("/api/gerencia/funcionarios/" + item.id);
-            loadFuncionarios();
-          } catch {
-            Alert.alert("Erro", "Nao foi possivel remover.");
-          }
-        },
-      },
-    ]);
-  };
-
-  const addFields = [
-    {
-      key: "nome",
-      label: "Nome *",
-      placeholder: "Nome completo",
-      secure: false,
-    },
-    {
-      key: "matricula",
-      label: "Matricula *",
-      placeholder: "Ex: 00123",
-      secure: false,
-    },
-    {
-      key: "cargo",
-      label: "Cargo *",
-      placeholder: "Ex: Analista",
-      secure: false,
-    },
-    { key: "setor", label: "Setor", placeholder: "Ex: TI", secure: false },
-    { key: "cpf", label: "CPF", placeholder: "000.000.000-00", secure: false },
-    {
-      key: "senha",
-      label: "Senha *",
-      placeholder: "Senha inicial",
-      secure: true,
-    },
-  ];
-
-  const editFields = [
-    {
-      key: "nome",
-      label: "Nome *",
-      placeholder: "Nome completo",
-      secure: false,
-    },
-    {
-      key: "matricula",
-      label: "Matricula *",
-      placeholder: "Ex: 00123",
-      secure: false,
-    },
-    {
-      key: "cargo",
-      label: "Cargo *",
-      placeholder: "Ex: Analista",
-      secure: false,
-    },
-    { key: "setor", label: "Setor", placeholder: "Ex: TI", secure: false },
-    { key: "cpf", label: "CPF", placeholder: "000.000.000-00", secure: false },
-    {
-      key: "senha",
-      label: "Nova Senha",
-      placeholder: "Deixe vazio para nao alterar",
-      secure: true,
-    },
-  ];
-
-  const renderFormModal = (
-    visible: boolean,
-    title: string,
-    formData: FuncionarioForm,
-    setFormData: (f: FuncionarioForm) => void,
-    fields: typeof addFields,
-    onSave: () => void,
-    onClose: () => void,
-    showStatus: boolean,
-  ) => (
-    <Modal visible={visible} animationType="slide" transparent>
-      <KeyboardAvoidingView
-        style={{ flex: 1 }}
-        behavior={Platform.OS === "ios" ? "padding" : "height"}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContainer}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>{title}</Text>
-              <TouchableOpacity onPress={onClose}>
-                <Ionicons name="close" size={24} color="#333" />
-              </TouchableOpacity>
-            </View>
-            <ScrollView
-              showsVerticalScrollIndicator={false}
-              keyboardShouldPersistTaps="handled"
-            >
-              <TouchableOpacity
-                style={styles.photoPicker}
-                onPress={() =>
-                  pickImage((b64) => setFormData({ ...formData, foto: b64 }))
-                }
-              >
-                {formData.foto ? (
-                  <Image
-                    source={{ uri: formData.foto }}
-                    style={styles.photoPreview}
-                  />
-                ) : (
-                  <View style={styles.photoPlaceholder}>
-                    <Ionicons name="camera-outline" size={32} color="#007bff" />
-                    <Text style={styles.photoPlaceholderText}>
-                      Adicionar foto
-                    </Text>
-                  </View>
-                )}
-              </TouchableOpacity>
-
-              {showStatus && (
-                <View style={styles.inputGroup}>
-                  <Text style={styles.inputLabel}>Status</Text>
-                  <View style={styles.statusRow}>
-                    {Object.entries(statusConfig).map(([key, val]) => (
-                      <TouchableOpacity
-                        key={key}
-                        style={[
-                          styles.statusOption,
-                          formData.status === key && {
-                            backgroundColor: val.color,
-                            borderColor: val.color,
-                          },
-                        ]}
-                        onPress={() =>
-                          setFormData({ ...formData, status: key })
-                        }
-                      >
-                        <Text
-                          style={[
-                            styles.statusOptionText,
-                            formData.status === key && { color: "#fff" },
-                          ]}
-                        >
-                          {val.label}
-                        </Text>
-                      </TouchableOpacity>
-                    ))}
-                  </View>
-                </View>
-              )}
-
-              {fields.map((field) => (
-                <View key={field.key} style={styles.inputGroup}>
-                  <Text style={styles.inputLabel}>{field.label}</Text>
-                  <TextInput
-                    style={styles.input}
-                    placeholder={field.placeholder}
-                    placeholderTextColor="#aaa"
-                    secureTextEntry={field.secure}
-                    value={
-                      formData[field.key as keyof FuncionarioForm] as string
-                    }
-                    onChangeText={(v) =>
-                      setFormData({ ...formData, [field.key]: v })
-                    }
-                  />
-                </View>
-              ))}
-            </ScrollView>
-            <TouchableOpacity
-              style={[styles.saveBtn, saving && { opacity: 0.7 }]}
-              onPress={onSave}
-              disabled={saving}
-            >
-              {saving ? (
-                <ActivityIndicator color="#fff" />
-              ) : (
-                <Text style={styles.saveBtnText}>{title}</Text>
-              )}
-            </TouchableOpacity>
-          </View>
-        </View>
-      </KeyboardAvoidingView>
-    </Modal>
-  );
-
   return (
     <View style={styles.container}>
       <AppHeader
         subtitle="Funcionarios"
         rightActions={
           <View style={{ flexDirection: "row" }}>
-            <TouchableOpacity onPress={loadFuncionarios} style={{ padding: 6, marginRight: 4 }}>
+            <TouchableOpacity
+              onPress={loadFuncionarios}
+              style={{ padding: 6, marginRight: 4 }}
+            >
               <Ionicons name="refresh-outline" size={22} color="#fff" />
             </TouchableOpacity>
-            <TouchableOpacity onPress={() => setModalVisible(true)} style={{ backgroundColor: "rgba(255,255,255,0.25)", borderRadius: 20, paddingHorizontal: 10, padding: 6 }}>
+            <TouchableOpacity
+              onPress={() => setModalVisible(true)}
+              style={{
+                backgroundColor: "rgba(255,255,255,0.25)",
+                borderRadius: 20,
+                paddingHorizontal: 10,
+                padding: 6,
+              }}
+            >
               <Ionicons name="person-add-outline" size={22} color="#fff" />
             </TouchableOpacity>
           </View>
@@ -417,6 +223,7 @@ function ManagerFuncionariosScreen(props: any): React.ReactElement {
               color: "#888",
             };
             return (
+              // Card inteiro é clicável → vai para detalhes (onde ficam editar/excluir)
               <TouchableOpacity
                 style={styles.card}
                 onPress={() =>
@@ -424,6 +231,7 @@ function ManagerFuncionariosScreen(props: any): React.ReactElement {
                     funcionarioId: item.id,
                   })
                 }
+                activeOpacity={0.75}
               >
                 <View style={styles.avatarContainer}>
                   {item.foto ? (
@@ -458,71 +266,104 @@ function ManagerFuncionariosScreen(props: any): React.ReactElement {
                     </Text>
                   </View>
                 </View>
-                <View style={styles.cardActions}>
-                  <TouchableOpacity
-                    onPress={() => handleEditar(item)}
-                    style={styles.editBtn}
-                  >
-                    <Ionicons name="pencil-outline" size={18} color="#007bff" />
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    onPress={() => handleRemover(item)}
-                    style={styles.removeBtn}
-                  >
-                    <Ionicons name="trash-outline" size={18} color="#dc3545" />
-                  </TouchableOpacity>
-                </View>
+                {/* Seta indicando que é clicável */}
+                <Ionicons
+                  name="chevron-forward-outline"
+                  size={20}
+                  color="#ccc"
+                />
               </TouchableOpacity>
             );
           }}
         />
       )}
 
-      {renderFormModal(
-        modalVisible,
-        "Adicionar Funcionario",
-        form,
-        setForm,
-        addFields,
-        handleAdicionar,
-        () => {
-          setModalVisible(false);
-          setForm(EMPTY_FORM);
-        },
-        false,
-      )}
-      {renderFormModal(
-        editModalVisible,
-        "Salvar Alteracoes",
-        editForm,
-        setEditForm,
-        editFields,
-        handleSalvarEdicao,
-        () => setEditModalVisible(false),
-        true,
-      )}
+      {/* Modal — Adicionar funcionario */}
+      <Modal visible={modalVisible} animationType="slide" transparent>
+        <KeyboardAvoidingView
+          style={{ flex: 1 }}
+          behavior={Platform.OS === "ios" ? "padding" : "height"}
+        >
+          <View style={styles.modalOverlay}>
+            <View style={styles.modalContainer}>
+              <View style={styles.modalHeader}>
+                <Text style={styles.modalTitle}>Adicionar Funcionario</Text>
+                <TouchableOpacity
+                  onPress={() => {
+                    setModalVisible(false);
+                    setForm(EMPTY_FORM);
+                  }}
+                >
+                  <Ionicons name="close" size={24} color="#333" />
+                </TouchableOpacity>
+              </View>
+              <ScrollView
+                showsVerticalScrollIndicator={false}
+                keyboardShouldPersistTaps="handled"
+              >
+                <TouchableOpacity
+                  style={styles.photoPicker}
+                  onPress={() =>
+                    pickImage((b64) => setForm((f) => ({ ...f, foto: b64 })))
+                  }
+                >
+                  {form.foto ? (
+                    <Image
+                      source={{ uri: form.foto }}
+                      style={styles.photoPreview}
+                    />
+                  ) : (
+                    <View style={styles.photoPlaceholder}>
+                      <Ionicons
+                        name="camera-outline"
+                        size={32}
+                        color="#007bff"
+                      />
+                      <Text style={styles.photoPlaceholderText}>
+                        Adicionar foto
+                      </Text>
+                    </View>
+                  )}
+                </TouchableOpacity>
+
+                {addFields.map((field) => (
+                  <View key={field.key} style={styles.inputGroup}>
+                    <Text style={styles.inputLabel}>{field.label}</Text>
+                    <TextInput
+                      style={styles.input}
+                      placeholder={field.placeholder}
+                      placeholderTextColor="#aaa"
+                      secureTextEntry={field.secure}
+                      value={form[field.key as keyof FuncionarioForm] as string}
+                      onChangeText={(v) =>
+                        setForm((f) => ({ ...f, [field.key]: v }))
+                      }
+                    />
+                  </View>
+                ))}
+              </ScrollView>
+
+              <TouchableOpacity
+                style={[styles.saveBtn, saving && { opacity: 0.7 }]}
+                onPress={handleAdicionar}
+                disabled={saving}
+              >
+                {saving ? (
+                  <ActivityIndicator color="#fff" />
+                ) : (
+                  <Text style={styles.saveBtnText}>Adicionar Funcionario</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#f0f2f5" },
-  header: {
-    backgroundColor: "#007bff",
-    paddingHorizontal: 20,
-    paddingBottom: 16,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-  },
-  headerTitle: { fontSize: 18, fontWeight: "bold", color: "#fff" },
-  headerActions: { flexDirection: "row", alignItems: "center" },
-  headerBtn: { padding: 6, marginLeft: 8 },
-  addBtn: {
-    backgroundColor: "rgba(255,255,255,0.25)",
-    borderRadius: 20,
-    paddingHorizontal: 10,
-  },
   center: { flex: 1, justifyContent: "center", alignItems: "center" },
   emptyText: { color: "#aaa", fontSize: 15, marginTop: 12 },
   card: {
@@ -561,9 +402,6 @@ const styles = StyleSheet.create({
     marginTop: 6,
   },
   statusText: { fontSize: 11, fontWeight: "bold" },
-  cardActions: { flexDirection: "column", alignItems: "center" },
-  editBtn: { padding: 6, marginBottom: 4 },
-  removeBtn: { padding: 6 },
   modalOverlay: { flex: 1, justifyContent: "flex-end" },
   modalContainer: {
     backgroundColor: "#fff",
@@ -616,17 +454,6 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
   saveBtnText: { color: "#fff", fontSize: 16, fontWeight: "bold" },
-  statusRow: { flexDirection: "row", justifyContent: "space-between" },
-  statusOption: {
-    flex: 1,
-    marginHorizontal: 4,
-    paddingVertical: 8,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: "#ddd",
-    alignItems: "center",
-  },
-  statusOptionText: { fontSize: 12, fontWeight: "bold", color: "#555" },
 });
 
 export default ManagerFuncionariosScreen;
