@@ -7,8 +7,18 @@ export interface LoginRequest {
   senha: string;
 }
 
+const getBaseURL = () => {
+  if (__DEV__) {
+    if (Platform.OS === "android") {
+      return process.env.EXPO_PUBLIC_API_URL; 
+    }
+    return process.env.EXPO_PUBLIC_API_URL || "http://localhost:8080";
+  }
+  return "https://api.infofolga.com.br";
+};
+
 const api = axios.create({
-  baseURL: process.env.API_BASE_URL || "http://localhost:8080",
+  baseURL: getBaseURL(),
   timeout: 5000,
 });
 
