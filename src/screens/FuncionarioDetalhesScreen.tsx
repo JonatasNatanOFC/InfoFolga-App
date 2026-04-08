@@ -8,15 +8,16 @@ import {
   ActivityIndicator,
   Image,
   Alert,
-  Modal,
-  TextInput,
-  KeyboardAvoidingView,
-  Platform,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
 import api from "../services/api";
 import AppHeader from "../components/AppHeader";
+import FuncionarioModal, {
+  FuncionarioForm,
+  FuncionarioField,
+} from "../components/FuncionarioModal";
+import { validarCpf } from "../utils/cpf";
 import { FuncionariosStackScreenProps } from "../navigation/types";
 
 interface Funcionario {
@@ -30,17 +31,6 @@ interface Funcionario {
   status: string;
 }
 
-interface FuncionarioForm {
-  nome: string;
-  matricula: string;
-  cargo: string;
-  setor: string;
-  cpf: string;
-  senha: string;
-  foto: string | null;
-  status: string;
-}
-
 const statusConfig: Record<string, { label: string; color: string }> = {
   ativo: { label: "Ativo", color: "#28a745" },
   inativo: { label: "Inativo", color: "#6c757d" },
@@ -48,7 +38,7 @@ const statusConfig: Record<string, { label: string; color: string }> = {
   folga: { label: "Folga", color: "#ffc107" },
 };
 
-const editFields = [
+const editFields: FuncionarioField[] = [
   { key: "nome", label: "Nome *", placeholder: "Nome completo", secure: false },
   {
     key: "matricula",
@@ -95,9 +85,7 @@ function FuncionarioDetalhesScreen(
     setLoading(true);
     api
       .get<Funcionario>("/api/gerencia/funcionarios/" + funcionarioId)
-      .then((r) => {
-        setFuncionario(r.data);
-      })
+      .then((r) => setFuncionario(r.data))
       .catch(() =>
         Alert.alert("Erro", "Nao foi possivel carregar os detalhes."),
       )
@@ -123,10 +111,54 @@ function FuncionarioDetalhesScreen(
     setEditModalVisible(true);
   };
 
+  const checkCpf = async (
+    digits: string,
+  ): Promise<"invalido" | "duplicado" | "ok" | null> => {
+    if (!validarCpf(digits)) return "invalido";
+    try {
+      console.log("[checkCpf] Verificando CPF:", digits);
+      const { data } = await api.get(
+        `/api/gerencia/funcionarios/buscar-cpf/${digits}`,
+      );
+      console.log("[checkCpf] Resposta:", data);
+      if (data && data.id !== funcionarioId) return "duplicado";
+      return "ok";
+    } catch (e: any) {
+      console.log("[checkCpf] Erro status:", e?.response?.status);
+      console.log("[checkCpf] Erro message:", e?.message);
+      console.log("[checkCpf] Erro completo:", JSON.stringify(e?.response));
+      if (e?.response?.status === 404) return "ok";
+      return null;
+    }
+  };
+
   const handleSalvarEdicao = async () => {
     if (!editForm.nome || !editForm.matricula || !editForm.cargo) {
       Alert.alert("Erro", "Preencha os campos obrigatorios.");
       return;
+    }
+    if (editForm.cpf && !validarCpf(editForm.cpf)) {
+      Alert.alert("Erro", "CPF invalido. Verifique os digitos informados.");
+      return;
+    }
+    if (editForm.cpf) {
+      try {
+        const { data } = await api.get(
+          `/api/gerencia/funcionarios/buscar-cpf/${editForm.cpf.replace(/\D/g, "")}`,
+        );
+        if (data && data.id !== funcionarioId) {
+          Alert.alert(
+            "Erro",
+            "Ja existe um funcionario cadastrado com este CPF.",
+          );
+          return;
+        }
+      } catch (e: any) {
+        if (e?.response?.status !== 404) {
+          Alert.alert("Erro", "Nao foi possivel verificar o CPF.");
+          return;
+        }
+      }
     }
     setSaving(true);
     try {
@@ -230,9 +262,7 @@ function FuncionarioDetalhesScreen(
 
   return (
     <View style={styles.container}>
-      <AppHeader
-        subtitle="Detalhes do Funcionario"
-      />
+      <AppHeader subtitle="Detalhes do Funcionario" />
 
       <ScrollView contentContainerStyle={{ padding: 20 }}>
         <View style={styles.profileCard}>
@@ -296,7 +326,6 @@ function FuncionarioDetalhesScreen(
           ))}
         </View>
 
-        {/* Botões de ação no rodapé */}
         <View style={styles.actionRow}>
           <TouchableOpacity style={styles.editBtn} onPress={abrirEdicao}>
             <Ionicons name="pencil-outline" size={18} color="#007bff" />
@@ -309,115 +338,19 @@ function FuncionarioDetalhesScreen(
         </View>
       </ScrollView>
 
-      {/* Modal de edição */}
-      <Modal visible={editModalVisible} animationType="slide" transparent>
-        <KeyboardAvoidingView
-          style={{ flex: 1 }}
-          behavior={Platform.OS === "ios" ? "padding" : "height"}
-        >
-          <View style={styles.modalOverlay}>
-            <View style={styles.modalContainer}>
-              <View style={styles.modalHeader}>
-                <Text style={styles.modalTitle}>Editar Funcionario</Text>
-                <TouchableOpacity onPress={() => setEditModalVisible(false)}>
-                  <Ionicons name="close" size={24} color="#333" />
-                </TouchableOpacity>
-              </View>
-
-              <ScrollView
-                showsVerticalScrollIndicator={false}
-                keyboardShouldPersistTaps="handled"
-              >
-                {/* Foto */}
-                <TouchableOpacity
-                  style={styles.photoPicker}
-                  onPress={pickImage}
-                >
-                  {editForm.foto ? (
-                    <Image
-                      source={{ uri: editForm.foto }}
-                      style={styles.photoPreview}
-                    />
-                  ) : (
-                    <View style={styles.photoPlaceholder}>
-                      <Ionicons
-                        name="camera-outline"
-                        size={32}
-                        color="#007bff"
-                      />
-                      <Text style={styles.photoPlaceholderText}>
-                        Adicionar foto
-                      </Text>
-                    </View>
-                  )}
-                </TouchableOpacity>
-
-                {/* Status */}
-                <View style={styles.inputGroup}>
-                  <Text style={styles.inputLabel}>Status</Text>
-                  <View style={styles.statusRow}>
-                    {Object.entries(statusConfig).map(([key, val]) => (
-                      <TouchableOpacity
-                        key={key}
-                        style={[
-                          styles.statusOption,
-                          editForm.status === key && {
-                            backgroundColor: val.color,
-                            borderColor: val.color,
-                          },
-                        ]}
-                        onPress={() =>
-                          setEditForm((f) => ({ ...f, status: key }))
-                        }
-                      >
-                        <Text
-                          style={[
-                            styles.statusOptionText,
-                            editForm.status === key && { color: "#fff" },
-                          ]}
-                        >
-                          {val.label}
-                        </Text>
-                      </TouchableOpacity>
-                    ))}
-                  </View>
-                </View>
-
-                {/* Campos */}
-                {editFields.map((field) => (
-                  <View key={field.key} style={styles.inputGroup}>
-                    <Text style={styles.inputLabel}>{field.label}</Text>
-                    <TextInput
-                      style={styles.input}
-                      placeholder={field.placeholder}
-                      placeholderTextColor="#aaa"
-                      secureTextEntry={field.secure}
-                      value={
-                        editForm[field.key as keyof FuncionarioForm] as string
-                      }
-                      onChangeText={(v) =>
-                        setEditForm((f) => ({ ...f, [field.key]: v }))
-                      }
-                    />
-                  </View>
-                ))}
-              </ScrollView>
-
-              <TouchableOpacity
-                style={[styles.saveBtn, saving && { opacity: 0.7 }]}
-                onPress={handleSalvarEdicao}
-                disabled={saving}
-              >
-                {saving ? (
-                  <ActivityIndicator color="#fff" />
-                ) : (
-                  <Text style={styles.saveBtnText}>Salvar Alteracoes</Text>
-                )}
-              </TouchableOpacity>
-            </View>
-          </View>
-        </KeyboardAvoidingView>
-      </Modal>
+      <FuncionarioModal
+        visible={editModalVisible}
+        title="Editar Funcionario"
+        form={editForm}
+        saving={saving}
+        submitLabel="Salvar Alteracoes"
+        fields={editFields}
+        onClose={() => setEditModalVisible(false)}
+        onSubmit={handleSalvarEdicao}
+        onChangeForm={setEditForm}
+        onPickImage={pickImage}
+        onCheckCpf={checkCpf}
+      />
     </View>
   );
 }
@@ -425,7 +358,6 @@ function FuncionarioDetalhesScreen(
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#f0f2f5" },
   center: { flex: 1, justifyContent: "center", alignItems: "center" },
-  headerBtn: { padding: 6, marginLeft: 8 },
   profileCard: {
     backgroundColor: "#fff",
     borderRadius: 16,
@@ -497,69 +429,6 @@ const styles = StyleSheet.create({
     elevation: 1,
   },
   removeBtnText: { color: "#dc3545", fontSize: 15, fontWeight: "bold" },
-  modalOverlay: { flex: 1, justifyContent: "flex-end" },
-  modalContainer: {
-    backgroundColor: "#fff",
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    padding: 24,
-    maxHeight: "92%",
-  },
-  modalHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 20,
-  },
-  modalTitle: { fontSize: 18, fontWeight: "bold", color: "#333" },
-  photoPicker: { alignSelf: "center", marginBottom: 20 },
-  photoPreview: { width: 90, height: 90, borderRadius: 45 },
-  photoPlaceholder: {
-    width: 90,
-    height: 90,
-    borderRadius: 45,
-    backgroundColor: "#e8f0fe",
-    justifyContent: "center",
-    alignItems: "center",
-    borderWidth: 2,
-    borderColor: "#007bff",
-    borderStyle: "dashed",
-  },
-  photoPlaceholderText: { fontSize: 11, color: "#007bff", marginTop: 4 },
-  inputGroup: { marginBottom: 14 },
-  inputLabel: {
-    fontSize: 13,
-    fontWeight: "bold",
-    color: "#555",
-    marginBottom: 6,
-  },
-  input: {
-    backgroundColor: "#f0f2f5",
-    borderRadius: 10,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    fontSize: 14,
-    color: "#333",
-  },
-  saveBtn: {
-    backgroundColor: "#007bff",
-    borderRadius: 12,
-    paddingVertical: 14,
-    alignItems: "center",
-    marginTop: 8,
-  },
-  saveBtnText: { color: "#fff", fontSize: 16, fontWeight: "bold" },
-  statusRow: { flexDirection: "row", justifyContent: "space-between" },
-  statusOption: {
-    flex: 1,
-    marginHorizontal: 4,
-    paddingVertical: 8,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: "#ddd",
-    alignItems: "center",
-  },
-  statusOptionText: { fontSize: 12, fontWeight: "bold", color: "#555" },
 });
 
 export default FuncionarioDetalhesScreen;

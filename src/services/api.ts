@@ -1,6 +1,6 @@
 import axios from "axios";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { Platform } from "react-native";
+import { Platform, Alert } from "react-native";
 
 export interface LoginRequest {
   matricula: string;
@@ -9,17 +9,14 @@ export interface LoginRequest {
 
 const getBaseURL = () => {
   if (__DEV__) {
-    if (Platform.OS === "android") {
-      return process.env.EXPO_PUBLIC_API_URL; 
-    }
-    return process.env.EXPO_PUBLIC_API_URL || "http://localhost:8080";
+    return process.env.EXPO_PUBLIC_API_URL || "http://10.10.185.3:8080";
   }
-  return "https://api.infofolga.com.br";
+  return "https://api.sisacesso.com.br";
 };
 
 const api = axios.create({
   baseURL: getBaseURL(),
-  timeout: 5000,
+  timeout: 10000,
 });
 
 api.interceptors.request.use(

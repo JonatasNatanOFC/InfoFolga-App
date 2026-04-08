@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   View,
   Text,
@@ -7,14 +7,19 @@ import {
   Alert,
   ActivityIndicator,
   TouchableOpacity,
-  KeyboardAvoidingView,
   Platform,
+  Keyboard,
 } from "react-native";
 import { AuthScreenProps } from "../navigation/types";
-import api, { LoginRequest } from "../services/api";
+import api from "../services/api";
 import { Ionicons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { StatusBar } from "expo-status-bar";
+
+interface LoginRequest {
+  cpf: string;
+  senha: string;
+}
 
 interface LoginResponse {
   token: string;
@@ -23,21 +28,44 @@ interface LoginResponse {
 }
 
 const LoginScreen: React.FC<AuthScreenProps<"Login">> = ({ navigation }) => {
-  const [matricula, setMatricula] = useState<string>("");
+  const [cpf, setCpf] = useState<string>("");
   const [senha, setSenha] = useState<string>("");
   const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [keyboardOpen, setKeyboardOpen] = useState(false);
+
+  useEffect(() => {
+    const showSub = Keyboard.addListener(
+      Platform.OS === "ios" ? "keyboardWillShow" : "keyboardDidShow",
+      () => setKeyboardOpen(true),
+    );
+    const hideSub = Keyboard.addListener(
+      Platform.OS === "ios" ? "keyboardWillHide" : "keyboardDidHide",
+      () => setKeyboardOpen(false),
+    );
+    return () => {
+      showSub.remove();
+      hideSub.remove();
+    };
+  }, []);
+
+  // Formata CPF: 000.000.000-00
+  const formatCpf = (value: string) => {
+    const digits = value.replace(/\D/g, "").slice(0, 11);
+    return digits
+      .replace(/(\d{3})(\d)/, "$1.$2")
+      .replace(/(\d{3})(\d)/, "$1.$2")
+      .replace(/(\d{3})(\d{1,2})$/, "$1-$2");
+  };
 
   const handleLogin = async () => {
-    if (!matricula || !senha) {
-      Alert.alert(
-        "Atenção",
-        "Por favor, preencha os campos de matrícula e senha.",
-      );
+    const cpfDigits = cpf.replace(/\D/g, "");
+    if (cpfDigits.length !== 11 || !senha) {
+      Alert.alert("Atenção", "Por favor, preencha o CPF completo e a senha.");
       return;
     }
     setIsLoading(true);
     try {
-      const loginData: LoginRequest = { matricula, senha };
+      const loginData: LoginRequest = { cpf: cpfDigits, senha };
       const response = await api.post<LoginResponse>(
         "/api/auth/login",
         loginData,
@@ -67,7 +95,7 @@ const LoginScreen: React.FC<AuthScreenProps<"Login">> = ({ navigation }) => {
       console.error("Falha no login:", error);
       let errorMessage = "Não foi possível conectar ao servidor.";
       if (error.isAxiosError && error.response) {
-        errorMessage = `Erro do servidor: ${error.response.status}. Matrícula ou senha inválida.`;
+        errorMessage = `Erro do servidor: ${error.response.status}. CPF ou senha inválida.`;
       } else if (error.isAxiosError && error.request) {
         errorMessage =
           "Erro de rede. Verifique sua conexão e se o servidor backend está rodando.";
@@ -79,9 +107,11 @@ const LoginScreen: React.FC<AuthScreenProps<"Login">> = ({ navigation }) => {
   };
 
   return (
-    <KeyboardAvoidingView
-      behavior={Platform.OS === "ios" ? "padding" : "height"}
-      style={styles.container}
+    <View
+      style={[
+        styles.container,
+        keyboardOpen && { justifyContent: "flex-start", paddingTop: 100 },
+      ]}
     >
       <StatusBar style="auto" />
       <View style={styles.header}>
@@ -92,12 +122,13 @@ const LoginScreen: React.FC<AuthScreenProps<"Login">> = ({ navigation }) => {
       <View style={styles.form}>
         <TextInput
           style={styles.input}
-          placeholder="Matrícula"
-          value={matricula}
-          onChangeText={setMatricula}
+          placeholder="CPF"
+          value={cpf}
+          onChangeText={(text) => setCpf(formatCpf(text))}
           keyboardType="numeric"
           editable={!isLoading}
           placeholderTextColor="#888"
+          maxLength={14}
         />
         <TextInput
           style={styles.input}
@@ -120,7 +151,7 @@ const LoginScreen: React.FC<AuthScreenProps<"Login">> = ({ navigation }) => {
           </TouchableOpacity>
         )}
       </View>
-    </KeyboardAvoidingView>
+    </View>
   );
 };
 

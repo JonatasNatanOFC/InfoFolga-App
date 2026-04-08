@@ -8,15 +8,15 @@ import {
   ActivityIndicator,
   Alert,
   Image,
-  Modal,
-  TextInput,
-  ScrollView,
-  KeyboardAvoidingView,
-  Platform,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
 import AppHeader from "../components/AppHeader";
+import FuncionarioModal, {
+  FuncionarioForm,
+  FuncionarioField,
+} from "../components/FuncionarioModal";
+import { validarCpf } from "../utils/cpf";
 import api from "../services/api";
 
 interface Funcionario {
@@ -30,21 +30,10 @@ interface Funcionario {
   status: string;
 }
 
-interface FuncionarioForm {
-  nome: string;
-  matricula: string;
-  cargo: string;
-  setor: string;
-  cpf: string;
-  senha: string;
-  foto: string | null;
-  status: string;
-}
-
 const statusConfig: Record<string, { label: string; color: string }> = {
   ativo: { label: "Ativo", color: "#28a745" },
   inativo: { label: "Inativo", color: "#6c757d" },
-  ferias: { label: "Ferias", color: "#17a2b8" },
+  ferias: { label: "Férias", color: "#17a2b8" },
   folga: { label: "Folga", color: "#ffc107" },
 };
 
@@ -59,11 +48,11 @@ const EMPTY_FORM: FuncionarioForm = {
   status: "ativo",
 };
 
-const addFields = [
+const addFields: FuncionarioField[] = [
   { key: "nome", label: "Nome *", placeholder: "Nome completo", secure: false },
   {
     key: "matricula",
-    label: "Matricula *",
+    label: "Matrícula *",
     placeholder: "Ex: 00123",
     secure: false,
   },
@@ -96,9 +85,16 @@ function ManagerFuncionariosScreen(props: any): React.ReactElement {
       const response = await api.get<Funcionario[]>(
         "/api/gerencia/funcionarios",
       );
+
+      // LOG DE TESTE ADICIONADO AQUI PARA INSPECIONAR A RESPOSTA DA API
+      console.log(
+        "DADOS RECEBIDOS DA API:",
+        JSON.stringify(response.data, null, 2),
+      );
+
       setFuncionarios(response.data);
     } catch {
-      Alert.alert("Erro", "Nao foi possivel carregar os funcionarios.");
+      Alert.alert("Erro", "Não foi possível carregar os funcionários.");
     } finally {
       setLoading(false);
     }
@@ -115,14 +111,14 @@ function ManagerFuncionariosScreen(props: any): React.ReactElement {
   };
 
   const pickImage = async (onPick: (base64: string) => void) => {
-    Alert.alert("Adicionar foto", "Escolha uma opcao", [
+    Alert.alert("Adicionar foto", "Escolha uma opção", [
       {
         text: "Galeria",
         onPress: async () => {
           const permission =
             await ImagePicker.requestMediaLibraryPermissionsAsync();
           if (!permission.granted) {
-            Alert.alert("Permissao negada", "Permita o acesso a galeria.");
+            Alert.alert("Permissão negada", "Permita o acesso à galeria.");
             return;
           }
           const result = await ImagePicker.launchImageLibraryAsync({
@@ -137,11 +133,11 @@ function ManagerFuncionariosScreen(props: any): React.ReactElement {
         },
       },
       {
-        text: "Camera",
+        text: "Câmera",
         onPress: async () => {
           const permission = await ImagePicker.requestCameraPermissionsAsync();
           if (!permission.granted) {
-            Alert.alert("Permissao negada", "Permita o acesso a camera.");
+            Alert.alert("Permissão negada", "Permita o acesso à câmera.");
             return;
           }
           const result = await ImagePicker.launchCameraAsync({
@@ -158,10 +154,51 @@ function ManagerFuncionariosScreen(props: any): React.ReactElement {
     ]);
   };
 
+  const checkCpf = async (
+    digits: string,
+  ): Promise<"invalido" | "duplicado" | "ok" | null> => {
+    if (!validarCpf(digits)) return "invalido";
+    try {
+      console.log("[checkCpf] Verificando CPF:", digits);
+      const response = await api.get(
+        `/api/gerencia/funcionarios/buscar-cpf/${digits}`,
+      );
+      console.log("[checkCpf] Resposta:", response.status, response.data);
+      return "duplicado";
+    } catch (e: any) {
+      console.log("[checkCpf] Erro status:", e?.response?.status);
+      console.log("[checkCpf] Erro message:", e?.message);
+      console.log("[checkCpf] Erro completo:", JSON.stringify(e?.response));
+      if (e?.response?.status === 404) return "ok";
+      return null;
+    }
+  };
+
   const handleAdicionar = async () => {
     if (!form.nome || !form.matricula || !form.cargo || !form.senha) {
-      Alert.alert("Erro", "Preencha todos os campos obrigatorios.");
+      Alert.alert("Erro", "Preencha todos os campos obrigatórios.");
       return;
+    }
+    if (form.cpf && !validarCpf(form.cpf)) {
+      Alert.alert("Erro", "CPF inválido. Verifique os dígitos informados.");
+      return;
+    }
+    if (form.cpf) {
+      try {
+        await api.get(
+          `/api/gerencia/funcionarios/buscar-cpf/${form.cpf.replace(/\D/g, "")}`,
+        );
+        Alert.alert(
+          "Erro",
+          "Já existe um funcionário cadastrado com este CPF.",
+        );
+        return;
+      } catch (e: any) {
+        if (e?.response?.status !== 404) {
+          Alert.alert("Erro", "Não foi possível verificar o CPF.");
+          return;
+        }
+      }
     }
     setSaving(true);
     try {
@@ -170,7 +207,7 @@ function ManagerFuncionariosScreen(props: any): React.ReactElement {
       setForm(EMPTY_FORM);
       loadFuncionarios();
     } catch {
-      Alert.alert("Erro", "Nao foi possivel adicionar o funcionario.");
+      Alert.alert("Erro", "Não foi possível adicionar o funcionário.");
     } finally {
       setSaving(false);
     }
@@ -179,7 +216,7 @@ function ManagerFuncionariosScreen(props: any): React.ReactElement {
   return (
     <View style={styles.container}>
       <AppHeader
-        subtitle="Funcionarios"
+        subtitle="Funcionários"
         rightActions={
           <View style={{ flexDirection: "row" }}>
             <TouchableOpacity
@@ -210,7 +247,7 @@ function ManagerFuncionariosScreen(props: any): React.ReactElement {
       ) : funcionarios.length === 0 ? (
         <View style={styles.center}>
           <Ionicons name="people-outline" size={48} color="#ccc" />
-          <Text style={styles.emptyText}>Nenhum funcionario encontrado</Text>
+          <Text style={styles.emptyText}>Nenhum funcionário encontrado</Text>
         </View>
       ) : (
         <FlatList
@@ -223,7 +260,6 @@ function ManagerFuncionariosScreen(props: any): React.ReactElement {
               color: "#888",
             };
             return (
-              // Card inteiro é clicável → vai para detalhes (onde ficam editar/excluir)
               <TouchableOpacity
                 style={styles.card}
                 onPress={() =>
@@ -253,7 +289,7 @@ function ManagerFuncionariosScreen(props: any): React.ReactElement {
                     CPF: {mascararCpf(item.cpf)}
                   </Text>
                   <Text style={styles.cardDetail}>
-                    Matricula: {item.matricula}
+                    Matrícula: {item.matricula}
                   </Text>
                   <View
                     style={[
@@ -266,7 +302,6 @@ function ManagerFuncionariosScreen(props: any): React.ReactElement {
                     </Text>
                   </View>
                 </View>
-                {/* Seta indicando que é clicável */}
                 <Ionicons
                   name="chevron-forward-outline"
                   size={20}
@@ -278,86 +313,24 @@ function ManagerFuncionariosScreen(props: any): React.ReactElement {
         />
       )}
 
-      {/* Modal — Adicionar funcionario */}
-      <Modal visible={modalVisible} animationType="slide" transparent>
-        <KeyboardAvoidingView
-          style={{ flex: 1 }}
-          behavior={Platform.OS === "ios" ? "padding" : "height"}
-        >
-          <View style={styles.modalOverlay}>
-            <View style={styles.modalContainer}>
-              <View style={styles.modalHeader}>
-                <Text style={styles.modalTitle}>Adicionar Funcionario</Text>
-                <TouchableOpacity
-                  onPress={() => {
-                    setModalVisible(false);
-                    setForm(EMPTY_FORM);
-                  }}
-                >
-                  <Ionicons name="close" size={24} color="#333" />
-                </TouchableOpacity>
-              </View>
-              <ScrollView
-                showsVerticalScrollIndicator={false}
-                keyboardShouldPersistTaps="handled"
-              >
-                <TouchableOpacity
-                  style={styles.photoPicker}
-                  onPress={() =>
-                    pickImage((b64) => setForm((f) => ({ ...f, foto: b64 })))
-                  }
-                >
-                  {form.foto ? (
-                    <Image
-                      source={{ uri: form.foto }}
-                      style={styles.photoPreview}
-                    />
-                  ) : (
-                    <View style={styles.photoPlaceholder}>
-                      <Ionicons
-                        name="camera-outline"
-                        size={32}
-                        color="#007bff"
-                      />
-                      <Text style={styles.photoPlaceholderText}>
-                        Adicionar foto
-                      </Text>
-                    </View>
-                  )}
-                </TouchableOpacity>
-
-                {addFields.map((field) => (
-                  <View key={field.key} style={styles.inputGroup}>
-                    <Text style={styles.inputLabel}>{field.label}</Text>
-                    <TextInput
-                      style={styles.input}
-                      placeholder={field.placeholder}
-                      placeholderTextColor="#aaa"
-                      secureTextEntry={field.secure}
-                      value={form[field.key as keyof FuncionarioForm] as string}
-                      onChangeText={(v) =>
-                        setForm((f) => ({ ...f, [field.key]: v }))
-                      }
-                    />
-                  </View>
-                ))}
-              </ScrollView>
-
-              <TouchableOpacity
-                style={[styles.saveBtn, saving && { opacity: 0.7 }]}
-                onPress={handleAdicionar}
-                disabled={saving}
-              >
-                {saving ? (
-                  <ActivityIndicator color="#fff" />
-                ) : (
-                  <Text style={styles.saveBtnText}>Adicionar Funcionario</Text>
-                )}
-              </TouchableOpacity>
-            </View>
-          </View>
-        </KeyboardAvoidingView>
-      </Modal>
+      <FuncionarioModal
+        visible={modalVisible}
+        title="Adicionar Funcionário"
+        form={form}
+        saving={saving}
+        submitLabel="Adicionar Funcionário"
+        fields={addFields}
+        onClose={() => {
+          setModalVisible(false);
+          setForm(EMPTY_FORM);
+        }}
+        onSubmit={handleAdicionar}
+        onChangeForm={setForm}
+        onPickImage={() =>
+          pickImage((b64) => setForm((f) => ({ ...f, foto: b64 })))
+        }
+        onCheckCpf={checkCpf}
+      />
     </View>
   );
 }
@@ -402,58 +375,6 @@ const styles = StyleSheet.create({
     marginTop: 6,
   },
   statusText: { fontSize: 11, fontWeight: "bold" },
-  modalOverlay: { flex: 1, justifyContent: "flex-end" },
-  modalContainer: {
-    backgroundColor: "#fff",
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    padding: 24,
-    maxHeight: "92%",
-  },
-  modalHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 20,
-  },
-  modalTitle: { fontSize: 18, fontWeight: "bold", color: "#333" },
-  photoPicker: { alignSelf: "center", marginBottom: 20 },
-  photoPreview: { width: 90, height: 90, borderRadius: 45 },
-  photoPlaceholder: {
-    width: 90,
-    height: 90,
-    borderRadius: 45,
-    backgroundColor: "#e8f0fe",
-    justifyContent: "center",
-    alignItems: "center",
-    borderWidth: 2,
-    borderColor: "#007bff",
-    borderStyle: "dashed",
-  },
-  photoPlaceholderText: { fontSize: 11, color: "#007bff", marginTop: 4 },
-  inputGroup: { marginBottom: 14 },
-  inputLabel: {
-    fontSize: 13,
-    fontWeight: "bold",
-    color: "#555",
-    marginBottom: 6,
-  },
-  input: {
-    backgroundColor: "#f0f2f5",
-    borderRadius: 10,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    fontSize: 14,
-    color: "#333",
-  },
-  saveBtn: {
-    backgroundColor: "#007bff",
-    borderRadius: 12,
-    paddingVertical: 14,
-    alignItems: "center",
-    marginTop: 8,
-  },
-  saveBtnText: { color: "#fff", fontSize: 16, fontWeight: "bold" },
 });
 
 export default ManagerFuncionariosScreen;
