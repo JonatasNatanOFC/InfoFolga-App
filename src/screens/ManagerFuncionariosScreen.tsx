@@ -81,20 +81,30 @@ function ManagerFuncionariosScreen(props: any): React.ReactElement {
 
   const loadFuncionarios = async () => {
     setLoading(true);
+
     try {
       const response = await api.get<Funcionario[]>(
         "/api/gerencia/funcionarios",
       );
 
-      // LOG DE TESTE ADICIONADO AQUI PARA INSPECIONAR A RESPOSTA DA API
       console.log(
         "DADOS RECEBIDOS DA API:",
         JSON.stringify(response.data, null, 2),
       );
-
       setFuncionarios(response.data);
-    } catch {
-      Alert.alert("Erro", "Não foi possível carregar os funcionários.");
+    } catch (e: any) {
+      const status = e?.response?.status;
+
+      if (status === 401) {
+        Alert.alert("Erro", "Sessão expirada. Faça login novamente.");
+      } else if (status === 403) {
+        Alert.alert(
+          "Erro",
+          "Você não tem permissão para acessar os funcionários.",
+        );
+      } else {
+        Alert.alert("Erro", "Não foi possível carregar os funcionários.");
+      }
     } finally {
       setLoading(false);
     }
@@ -117,10 +127,12 @@ function ManagerFuncionariosScreen(props: any): React.ReactElement {
         onPress: async () => {
           const permission =
             await ImagePicker.requestMediaLibraryPermissionsAsync();
+
           if (!permission.granted) {
             Alert.alert("Permissão negada", "Permita o acesso à galeria.");
             return;
           }
+
           const result = await ImagePicker.launchImageLibraryAsync({
             mediaTypes: ImagePicker.MediaTypeOptions.Images,
             allowsEditing: true,
@@ -128,26 +140,32 @@ function ManagerFuncionariosScreen(props: any): React.ReactElement {
             quality: 0.7,
             base64: true,
           });
-          if (!result.canceled && result.assets[0])
+
+          if (!result.canceled && result.assets[0]) {
             onPick("data:image/jpeg;base64," + result.assets[0].base64);
+          }
         },
       },
       {
         text: "Câmera",
         onPress: async () => {
           const permission = await ImagePicker.requestCameraPermissionsAsync();
+
           if (!permission.granted) {
             Alert.alert("Permissão negada", "Permita o acesso à câmera.");
             return;
           }
+
           const result = await ImagePicker.launchCameraAsync({
             allowsEditing: true,
             aspect: [1, 1],
             quality: 0.7,
             base64: true,
           });
-          if (!result.canceled && result.assets[0])
+
+          if (!result.canceled && result.assets[0]) {
             onPick("data:image/jpeg;base64," + result.assets[0].base64);
+          }
         },
       },
       { text: "Cancelar", style: "cancel" },
@@ -155,59 +173,67 @@ function ManagerFuncionariosScreen(props: any): React.ReactElement {
   };
 
   const checkCpf = async (
-    digits: string,
-  ): Promise<"invalido" | "duplicado" | "ok" | null> => {
-    if (!validarCpf(digits)) return "invalido";
-    try {
-      console.log("[checkCpf] Verificando CPF:", digits);
-      const response = await api.get(
-        `/api/gerencia/funcionarios/buscar-cpf/${digits}`,
-      );
-      console.log("[checkCpf] Resposta:", response.status, response.data);
-      return "duplicado";
-    } catch (e: any) {
-      console.log("[checkCpf] Erro status:", e?.response?.status);
-      console.log("[checkCpf] Erro message:", e?.message);
-      console.log("[checkCpf] Erro completo:", JSON.stringify(e?.response));
-      if (e?.response?.status === 404) return "ok";
-      return null;
-    }
-  };
+  digits: string,
+): Promise<"invalido" | "duplicado" | "ok" | null> => {
+  if (!validarCpf(digits)) return "invalido";
+
+  try {
+    await api.get(`/api/gerencia/funcionarios/buscar-cpf/${digits}`);
+    return "duplicado";
+  } catch (e: any) {
+    if (e?.response?.status === 404) return "ok";
+    return null;
+  }
+};
 
   const handleAdicionar = async () => {
     if (!form.nome || !form.matricula || !form.cargo || !form.senha) {
       Alert.alert("Erro", "Preencha todos os campos obrigatórios.");
       return;
     }
-    if (form.cpf && !validarCpf(form.cpf)) {
+
+    const cpfDigitos = form.cpf?.replace(/\D/g, "") ?? "";
+
+    if (cpfDigitos && !validarCpf(cpfDigitos)) {
       Alert.alert("Erro", "CPF inválido. Verifique os dígitos informados.");
       return;
     }
-    if (form.cpf) {
-      try {
-        await api.get(
-          `/api/gerencia/funcionarios/buscar-cpf/${form.cpf.replace(/\D/g, "")}`,
-        );
-        Alert.alert(
-          "Erro",
-          "Já existe um funcionário cadastrado com este CPF.",
-        );
-        return;
-      } catch (e: any) {
-        if (e?.response?.status !== 404) {
-          Alert.alert("Erro", "Não foi possível verificar o CPF.");
-          return;
-        }
-      }
+
+    if (cpfDigitos) {
+  try {
+    await api.get(`/api/gerencia/funcionarios/buscar-cpf/${cpfDigitos}`);
+    Alert.alert("Erro", "Ja existe um funcionario cadastrado com este CPF.");
+    return;
+  } catch (e: any) {
+    if (e?.response?.status !== 404) {
+      console.warn("[verificar-cpf] Erro inesperado:", e?.response?.status);
     }
+  }
+}
+
     setSaving(true);
+
     try {
-      await api.post("/api/gerencia/funcionarios", form);
+      await api.post("/api/gerencia/funcionarios", {
+        ...form,
+        cpf: cpfDigitos || null,
+      });
+
       setModalVisible(false);
       setForm(EMPTY_FORM);
-      loadFuncionarios();
-    } catch {
-      Alert.alert("Erro", "Não foi possível adicionar o funcionário.");
+      await loadFuncionarios();
+    } catch (e: any) {
+      const status = e?.response?.status;
+
+      if (status === 401) {
+        Alert.alert("Erro", "Sessão expirada. Faça login novamente.");
+      } else if (status === 403) {
+        Alert.alert("Erro", "Você não tem permissão para adicionar funcionário.");
+      } else if (status === 409) {
+        Alert.alert("Erro", "Já existe um funcionário cadastrado com este CPF ou matrícula.");
+      } else {
+        Alert.alert("Erro", "Não foi possível adicionar o funcionário.");
+      }
     } finally {
       setSaving(false);
     }
@@ -225,6 +251,7 @@ function ManagerFuncionariosScreen(props: any): React.ReactElement {
             >
               <Ionicons name="refresh-outline" size={22} color="#fff" />
             </TouchableOpacity>
+
             <TouchableOpacity
               onPress={() => setModalVisible(true)}
               style={{
@@ -259,6 +286,7 @@ function ManagerFuncionariosScreen(props: any): React.ReactElement {
               label: item.status,
               color: "#888",
             };
+
             return (
               <TouchableOpacity
                 style={styles.card}
@@ -283,6 +311,7 @@ function ManagerFuncionariosScreen(props: any): React.ReactElement {
                     />
                   )}
                 </View>
+
                 <View style={styles.cardInfo}>
                   <Text style={styles.cardName}>{item.nome}</Text>
                   <Text style={styles.cardDetail}>
@@ -291,6 +320,7 @@ function ManagerFuncionariosScreen(props: any): React.ReactElement {
                   <Text style={styles.cardDetail}>
                     Matrícula: {item.matricula}
                   </Text>
+
                   <View
                     style={[
                       styles.statusBadge,
@@ -302,6 +332,7 @@ function ManagerFuncionariosScreen(props: any): React.ReactElement {
                     </Text>
                   </View>
                 </View>
+
                 <Ionicons
                   name="chevron-forward-outline"
                   size={20}

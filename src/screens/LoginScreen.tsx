@@ -11,9 +11,8 @@ import {
   Keyboard,
 } from "react-native";
 import { AuthScreenProps } from "../navigation/types";
-import api from "../services/api";
+import api, { setAuthToken } from "../services/api";
 import { Ionicons } from "@expo/vector-icons";
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import { StatusBar } from "expo-status-bar";
 
 interface LoginRequest {
@@ -42,13 +41,13 @@ const LoginScreen: React.FC<AuthScreenProps<"Login">> = ({ navigation }) => {
       Platform.OS === "ios" ? "keyboardWillHide" : "keyboardDidHide",
       () => setKeyboardOpen(false),
     );
+
     return () => {
       showSub.remove();
       hideSub.remove();
     };
   }, []);
 
-  // Formata CPF: 000.000.000-00
   const formatCpf = (value: string) => {
     const digits = value.replace(/\D/g, "").slice(0, 11);
     return digits
@@ -59,13 +58,20 @@ const LoginScreen: React.FC<AuthScreenProps<"Login">> = ({ navigation }) => {
 
   const handleLogin = async () => {
     const cpfDigits = cpf.replace(/\D/g, "");
+
     if (cpfDigits.length !== 11 || !senha) {
       Alert.alert("Atenção", "Por favor, preencha o CPF completo e a senha.");
       return;
     }
+
     setIsLoading(true);
+
     try {
-      const loginData: LoginRequest = { cpf: cpfDigits, senha };
+      const loginData: LoginRequest = {
+        cpf: cpfDigits,
+        senha,
+      };
+
       const response = await api.post<LoginResponse>(
         "/api/auth/login",
         loginData,
@@ -77,11 +83,14 @@ const LoginScreen: React.FC<AuthScreenProps<"Login">> = ({ navigation }) => {
           "Erro de Login",
           "A resposta do servidor não incluiu um token.",
         );
-        setIsLoading(false);
         return;
       }
 
-      await AsyncStorage.setItem("userToken", token);
+      await setAuthToken(token);
+
+      console.log("LOGIN OK");
+      console.log("TOKEN RECEBIDO:", token);
+      console.log("ROLE RECEBIDA:", role);
 
       if (role === "ROLE_GERENTE") {
         navigation.replace("ManagerApp", { screen: "Inicio" });
@@ -93,13 +102,22 @@ const LoginScreen: React.FC<AuthScreenProps<"Login">> = ({ navigation }) => {
       }
     } catch (error: any) {
       console.error("Falha no login:", error);
+
       let errorMessage = "Não foi possível conectar ao servidor.";
-      if (error.isAxiosError && error.response) {
-        errorMessage = `Erro do servidor: ${error.response.status}. CPF ou senha inválida.`;
-      } else if (error.isAxiosError && error.request) {
+
+      if (error?.isAxiosError && error?.response) {
+        if (error.response.status === 401) {
+          errorMessage = "CPF ou senha inválidos.";
+        } else if (error.response.status === 403) {
+          errorMessage = "Você não tem permissão para acessar.";
+        } else {
+          errorMessage = `Erro do servidor: ${error.response.status}.`;
+        }
+      } else if (error?.isAxiosError && error?.request) {
         errorMessage =
-          "Erro de rede. Verifique sua conexão e se o servidor backend está rodando.";
+          "Erro de rede. Verifique sua conexão e se o backend está rodando.";
       }
+
       Alert.alert("Erro no Login", errorMessage);
     } finally {
       setIsLoading(false);
@@ -114,11 +132,13 @@ const LoginScreen: React.FC<AuthScreenProps<"Login">> = ({ navigation }) => {
       ]}
     >
       <StatusBar style="auto" />
+
       <View style={styles.header}>
         <Ionicons name="briefcase-outline" size={60} color="#007bff" />
         <Text style={styles.title}>Controle de Folgas</Text>
         <Text style={styles.subtitle}>Faça login para continuar</Text>
       </View>
+
       <View style={styles.form}>
         <TextInput
           style={styles.input}
@@ -130,6 +150,7 @@ const LoginScreen: React.FC<AuthScreenProps<"Login">> = ({ navigation }) => {
           placeholderTextColor="#888"
           maxLength={14}
         />
+
         <TextInput
           style={styles.input}
           placeholder="Senha"
@@ -139,6 +160,7 @@ const LoginScreen: React.FC<AuthScreenProps<"Login">> = ({ navigation }) => {
           editable={!isLoading}
           placeholderTextColor="#888"
         />
+
         {isLoading ? (
           <ActivityIndicator
             size="large"

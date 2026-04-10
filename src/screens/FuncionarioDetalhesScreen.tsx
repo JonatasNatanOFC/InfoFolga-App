@@ -66,6 +66,7 @@ function FuncionarioDetalhesScreen(
   props: FuncionariosStackScreenProps<"FuncionarioDetalhes">,
 ): React.ReactElement {
   const { funcionarioId } = props.route.params;
+
   const [funcionario, setFuncionario] = useState<Funcionario | null>(null);
   const [loading, setLoading] = useState(true);
   const [editModalVisible, setEditModalVisible] = useState(false);
@@ -83,12 +84,24 @@ function FuncionarioDetalhesScreen(
 
   const loadFuncionario = () => {
     setLoading(true);
+
     api
       .get<Funcionario>("/api/gerencia/funcionarios/" + funcionarioId)
       .then((r) => setFuncionario(r.data))
-      .catch(() =>
-        Alert.alert("Erro", "Nao foi possivel carregar os detalhes."),
-      )
+      .catch((e) => {
+        const status = e?.response?.status;
+
+        if (status === 401) {
+          Alert.alert("Erro", "Sessão expirada. Faça login novamente.");
+        } else if (status === 403) {
+          Alert.alert(
+            "Erro",
+            "Você não tem permissão para acessar este funcionário.",
+          );
+        } else {
+          Alert.alert("Erro", "Nao foi possivel carregar os detalhes.");
+        }
+      })
       .finally(() => setLoading(false));
   };
 
@@ -98,6 +111,7 @@ function FuncionarioDetalhesScreen(
 
   const abrirEdicao = () => {
     if (!funcionario) return;
+
     setEditForm({
       nome: funcionario.nome,
       matricula: funcionario.matricula,
@@ -108,65 +122,85 @@ function FuncionarioDetalhesScreen(
       foto: funcionario.foto,
       status: funcionario.status,
     });
+
     setEditModalVisible(true);
   };
 
   const checkCpf = async (
     digits: string,
   ): Promise<"invalido" | "duplicado" | "ok" | null> => {
-    if (!validarCpf(digits)) return "invalido";
-    try {
-      console.log("[checkCpf] Verificando CPF:", digits);
-      const { data } = await api.get(
-        `/api/gerencia/funcionarios/buscar-cpf/${digits}`,
-      );
-      console.log("[checkCpf] Resposta:", data);
-      if (data && data.id !== funcionarioId) return "duplicado";
-      return "ok";
-    } catch (e: any) {
-      console.log("[checkCpf] Erro status:", e?.response?.status);
-      console.log("[checkCpf] Erro message:", e?.message);
-      console.log("[checkCpf] Erro completo:", JSON.stringify(e?.response));
-      if (e?.response?.status === 404) return "ok";
-      return null;
-    }
-  };
+  if (!validarCpf(digits)) return "invalido";
+
+  if (funcionario?.cpf?.replace(/\D/g, "") === digits) return "ok";
+
+  try {
+    const { data } = await api.get(
+      `/api/gerencia/funcionarios/buscar-cpf/${digits}`,
+    );
+    if (data && data.id !== funcionarioId) return "duplicado";
+    return "ok";
+  } catch (e: any) {
+    if (e?.response?.status === 404) return "ok";
+    return null;
+  }
+};
 
   const handleSalvarEdicao = async () => {
     if (!editForm.nome || !editForm.matricula || !editForm.cargo) {
       Alert.alert("Erro", "Preencha os campos obrigatorios.");
       return;
     }
-    if (editForm.cpf && !validarCpf(editForm.cpf)) {
+
+    const cpfDigitos = editForm.cpf.replace(/\D/g, "");
+    const cpfAtualDigitos = funcionario?.cpf?.replace(/\D/g, "") ?? "";
+
+    // Valida CPF apenas se foi informado
+    if (cpfDigitos && !validarCpf(cpfDigitos)) {
       Alert.alert("Erro", "CPF invalido. Verifique os digitos informados.");
       return;
     }
-    if (editForm.cpf) {
-      try {
-        const { data } = await api.get(
-          `/api/gerencia/funcionarios/buscar-cpf/${editForm.cpf.replace(/\D/g, "")}`,
-        );
-        if (data && data.id !== funcionarioId) {
-          Alert.alert(
-            "Erro",
-            "Ja existe um funcionario cadastrado com este CPF.",
-          );
-          return;
-        }
-      } catch (e: any) {
-        if (e?.response?.status !== 404) {
-          Alert.alert("Erro", "Nao foi possivel verificar o CPF.");
-          return;
-        }
-      }
+
+    if (cpfDigitos && cpfDigitos !== cpfAtualDigitos) {
+  try {
+    const { data } = await api.get(
+      `/api/gerencia/funcionarios/buscar-cpf/${cpfDigitos}`,
+    );
+    if (data && data.id !== funcionarioId) {
+      Alert.alert("Erro", "Ja existe um funcionario cadastrado com este CPF.");
+      return;
     }
+  } catch (e: any) {
+    if (e?.response?.status !== 404) {
+      console.warn("[verificar-cpf] Erro inesperado:", e?.response?.status);
+    }
+  }
+} 
+
     setSaving(true);
+
     try {
-      await api.put("/api/gerencia/funcionarios/" + funcionarioId, editForm);
+      await api.put("/api/gerencia/funcionarios/" + funcionarioId, {
+        ...editForm,
+        cpf: cpfDigitos || null,
+      });
+
       setEditModalVisible(false);
       loadFuncionario();
-    } catch {
-      Alert.alert("Erro", "Nao foi possivel atualizar o funcionario.");
+    } catch (e: any) {
+      const status = e?.response?.status;
+
+      if (status === 401) {
+        Alert.alert("Erro", "Sessão expirada. Faça login novamente.");
+      } else if (status === 403) {
+        Alert.alert(
+          "Erro",
+          "Você não tem permissão para atualizar o funcionário.",
+        );
+      } else if (status === 409) {
+        Alert.alert("Erro", "Ja existe um funcionario cadastrado com este CPF ou matrícula.");
+      } else {
+        Alert.alert("Erro", "Nao foi possivel atualizar o funcionario.");
+      }
     } finally {
       setSaving(false);
     }
@@ -174,6 +208,7 @@ function FuncionarioDetalhesScreen(
 
   const handleRemover = () => {
     if (!funcionario) return;
+
     Alert.alert("Remover", "Deseja remover " + funcionario.nome + "?", [
       { text: "Cancelar", style: "cancel" },
       {
@@ -183,8 +218,19 @@ function FuncionarioDetalhesScreen(
           try {
             await api.delete("/api/gerencia/funcionarios/" + funcionarioId);
             props.navigation.goBack();
-          } catch {
-            Alert.alert("Erro", "Nao foi possivel remover o funcionario.");
+          } catch (e: any) {
+            const status = e?.response?.status;
+
+            if (status === 401) {
+              Alert.alert("Erro", "Sessão expirada. Faça login novamente.");
+            } else if (status === 403) {
+              Alert.alert(
+                "Erro",
+                "Você não tem permissão para remover o funcionário.",
+              );
+            } else {
+              Alert.alert("Erro", "Nao foi possivel remover o funcionario.");
+            }
           }
         },
       },
@@ -198,10 +244,12 @@ function FuncionarioDetalhesScreen(
         onPress: async () => {
           const permission =
             await ImagePicker.requestMediaLibraryPermissionsAsync();
+
           if (!permission.granted) {
             Alert.alert("Permissao negada", "Permita o acesso a galeria.");
             return;
           }
+
           const result = await ImagePicker.launchImageLibraryAsync({
             mediaTypes: ImagePicker.MediaTypeOptions.Images,
             allowsEditing: true,
@@ -209,51 +257,59 @@ function FuncionarioDetalhesScreen(
             quality: 0.7,
             base64: true,
           });
-          if (!result.canceled && result.assets[0])
+
+          if (!result.canceled && result.assets[0]) {
             setEditForm((f) => ({
               ...f,
               foto: "data:image/jpeg;base64," + result.assets[0].base64,
             }));
+          }
         },
       },
       {
         text: "Camera",
         onPress: async () => {
           const permission = await ImagePicker.requestCameraPermissionsAsync();
+
           if (!permission.granted) {
             Alert.alert("Permissao negada", "Permita o acesso a camera.");
             return;
           }
+
           const result = await ImagePicker.launchCameraAsync({
             allowsEditing: true,
             aspect: [1, 1],
             quality: 0.7,
             base64: true,
           });
-          if (!result.canceled && result.assets[0])
+
+          if (!result.canceled && result.assets[0]) {
             setEditForm((f) => ({
               ...f,
               foto: "data:image/jpeg;base64," + result.assets[0].base64,
             }));
+          }
         },
       },
       { text: "Cancelar", style: "cancel" },
     ]);
   };
 
-  if (loading)
+  if (loading) {
     return (
       <View style={styles.center}>
         <ActivityIndicator size="large" color="#007bff" />
       </View>
     );
+  }
 
-  if (!funcionario)
+  if (!funcionario) {
     return (
       <View style={styles.center}>
         <Text>Funcionario nao encontrado</Text>
       </View>
     );
+  }
 
   const st = statusConfig[funcionario.status] ?? {
     label: funcionario.status,
@@ -273,7 +329,9 @@ function FuncionarioDetalhesScreen(
               <Ionicons name="person-circle-outline" size={90} color="#bbb" />
             )}
           </View>
+
           <Text style={styles.nome}>{funcionario.nome}</Text>
+
           <View
             style={[styles.statusBadge, { backgroundColor: st.color + "22" }]}
           >
@@ -318,6 +376,7 @@ function FuncionarioDetalhesScreen(
               <View style={styles.infoIconContainer}>
                 <Ionicons name={item.icon as any} size={20} color="#007bff" />
               </View>
+
               <View style={styles.infoContent}>
                 <Text style={styles.infoLabel}>{item.label}</Text>
                 <Text style={styles.infoValue}>{item.value}</Text>
@@ -331,6 +390,7 @@ function FuncionarioDetalhesScreen(
             <Ionicons name="pencil-outline" size={18} color="#007bff" />
             <Text style={styles.editBtnText}>Editar</Text>
           </TouchableOpacity>
+
           <TouchableOpacity style={styles.removeBtn} onPress={handleRemover}>
             <Ionicons name="trash-outline" size={18} color="#dc3545" />
             <Text style={styles.removeBtnText}>Remover</Text>
