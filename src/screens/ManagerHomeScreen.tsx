@@ -44,7 +44,7 @@ const ManagerHomeScreen: React.FC<ManagerTabScreenProps<"Inicio">> = ({
       setStats(statsResponse.data);
       setUserName(userResponse.data.nome);
     } catch (error) {
-      console.error("Erro ao carregar dados iniciais:", error);
+      console.warn("Erro ao carregar dados iniciais:", error);
       Alert.alert("Erro", "Não foi possível carregar os dados do painel.");
       setStats({ pendingRequests: 0, totalEmployees: 0, approvedLast30Days: 0, rejectedLast30Days: 0 });
       setUserName("Gerente");

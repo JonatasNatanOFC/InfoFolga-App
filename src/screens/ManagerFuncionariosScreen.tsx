@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useCallback } from "react";
 import {
   View,
   Text,
@@ -18,6 +18,7 @@ import FuncionarioModal, {
 } from "../components/FuncionarioModal";
 import { validarCpf } from "../utils/cpf";
 import api from "../services/api";
+import { useFocusEffect } from "@react-navigation/native";
 
 interface Funcionario {
   id: number;
@@ -75,22 +76,20 @@ const addFields: FuncionarioField[] = [
 function ManagerFuncionariosScreen(props: any): React.ReactElement {
   const [funcionarios, setFuncionarios] = useState<Funcionario[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [modalVisible, setModalVisible] = useState(false);
   const [form, setForm] = useState<FuncionarioForm>(EMPTY_FORM);
   const [saving, setSaving] = useState(false);
 
-  const loadFuncionarios = async () => {
-    setLoading(true);
+  const loadFuncionarios = async (pullToRefresh = false) => {
+    if (pullToRefresh) {
+      setRefreshing(true);
+    } else {
+      setLoading(true);
+    }
 
     try {
-      const response = await api.get<Funcionario[]>(
-        "/api/gerencia/funcionarios",
-      );
-
-      console.log(
-        "DADOS RECEBIDOS DA API:",
-        JSON.stringify(response.data, null, 2),
-      );
+      const response = await api.get<Funcionario[]>("/api/gerencia/funcionarios");
       setFuncionarios(response.data);
     } catch (e: any) {
       const status = e?.response?.status;
@@ -98,21 +97,24 @@ function ManagerFuncionariosScreen(props: any): React.ReactElement {
       if (status === 401) {
         Alert.alert("Erro", "Sessão expirada. Faça login novamente.");
       } else if (status === 403) {
-        Alert.alert(
-          "Erro",
-          "Você não tem permissão para acessar os funcionários.",
-        );
+        Alert.alert("Erro", "Sem permissão para acessar os funcionários.");
       } else {
         Alert.alert("Erro", "Não foi possível carregar os funcionários.");
       }
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
   };
 
-  useEffect(() => {
-    loadFuncionarios();
-  }, []);
+  const handleRefresh = () => loadFuncionarios(true);
+
+  // Recarrega a lista sempre que a tela volta ao foco (ex: após editar um funcionário)
+  useFocusEffect(
+    useCallback(() => {
+      loadFuncionarios();
+    }, []),
+  );
 
   const mascararCpf = (cpf: string | null) => {
     if (!cpf) return "***.***.***-**";
@@ -244,26 +246,17 @@ function ManagerFuncionariosScreen(props: any): React.ReactElement {
       <AppHeader
         subtitle="Funcionários"
         rightActions={
-          <View style={{ flexDirection: "row" }}>
-            <TouchableOpacity
-              onPress={loadFuncionarios}
-              style={{ padding: 6, marginRight: 4 }}
-            >
-              <Ionicons name="refresh-outline" size={22} color="#fff" />
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              onPress={() => setModalVisible(true)}
-              style={{
-                backgroundColor: "rgba(255,255,255,0.25)",
-                borderRadius: 20,
-                paddingHorizontal: 10,
-                padding: 6,
-              }}
-            >
-              <Ionicons name="person-add-outline" size={22} color="#fff" />
-            </TouchableOpacity>
-          </View>
+          <TouchableOpacity
+            onPress={() => setModalVisible(true)}
+            style={{
+              backgroundColor: "rgba(255,255,255,0.25)",
+              borderRadius: 20,
+              paddingHorizontal: 10,
+              padding: 6,
+            }}
+          >
+            <Ionicons name="person-add-outline" size={22} color="#fff" />
+          </TouchableOpacity>
         }
       />
 
@@ -281,6 +274,8 @@ function ManagerFuncionariosScreen(props: any): React.ReactElement {
           data={funcionarios}
           keyExtractor={(item) => String(item.id)}
           contentContainerStyle={{ padding: 16 }}
+          refreshing={refreshing}
+          onRefresh={handleRefresh}
           renderItem={({ item }) => {
             const st = statusConfig[item.status] ?? {
               label: item.status,

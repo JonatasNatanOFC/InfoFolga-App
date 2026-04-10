@@ -66,59 +66,57 @@ const LoginScreen: React.FC<AuthScreenProps<"Login">> = ({ navigation }) => {
 
     setIsLoading(true);
 
-    try {
-      const loginData: LoginRequest = {
-        cpf: cpfDigits,
-        senha,
-      };
+    // Usa .then/.catch para NUNCA rejeitar a promise externamente.
+    // O try/catch padrão em modo dev do Expo pode deixar o overlay aparecer
+    // antes de capturar o erro; este padrão evita isso completamente.
+    const result = await api
+      .post<LoginResponse>("/api/auth/login", { cpf: cpfDigits, senha })
+      .then((response) => ({ ok: true as const, data: response.data }))
+      .catch((error: any) => ({ ok: false as const, error }));
 
-      const response = await api.post<LoginResponse>(
-        "/api/auth/login",
-        loginData,
-      );
-      const { token, nomeUsuario, role } = response.data;
+    setIsLoading(false);
 
-      if (!token) {
-        Alert.alert(
-          "Erro de Login",
-          "A resposta do servidor não incluiu um token.",
-        );
-        return;
-      }
-
-      await setAuthToken(token);
-
-      console.log("LOGIN OK");
-      console.log("TOKEN RECEBIDO:", token);
-      console.log("ROLE RECEBIDA:", role);
-
-      if (role === "ROLE_GERENTE") {
-        navigation.replace("ManagerApp", { screen: "Inicio" });
-      } else {
-        navigation.replace("EmployeeApp", {
-          screen: "Home",
-          params: { nomeUsuario },
-        });
-      }
-    } catch (error: any) {
-      console.error("Falha no login:", error);
-
+    if (!result.ok) {
+      const error = result.error;
       let errorMessage = "Não foi possível conectar ao servidor.";
 
       if (error?.isAxiosError && error?.response) {
-        if (error.response.status === 401 || error.response.status === 403) {
+        const backMessage =
+          typeof error.response.data === "string"
+            ? error.response.data
+            : error.response.data?.message ?? error.response.data?.erro;
+
+        if (backMessage) {
+          errorMessage = backMessage;
+        } else if (error.response.status === 401 || error.response.status === 403) {
           errorMessage = "CPF ou senha inválidos.";
         } else {
-          errorMessage = `Erro do servidor: ${error.response.status}.`;
+          errorMessage = `Erro do servidor (${error.response.status}).`;
         }
       } else if (error?.isAxiosError && error?.request) {
-        errorMessage =
-          "Erro de rede. Verifique sua conexão e se o backend está rodando.";
+        errorMessage = "Erro de rede. Verifique sua conexão e se o servidor está acessível.";
       }
 
       Alert.alert("Erro no Login", errorMessage);
-    } finally {
-      setIsLoading(false);
+      return;
+    }
+
+    const { token, nomeUsuario, role } = result.data;
+
+    if (!token) {
+      Alert.alert("Erro de Login", "A resposta do servidor não incluiu um token.");
+      return;
+    }
+
+    await setAuthToken(token);
+
+    if (role === "ROLE_GERENTE") {
+      navigation.replace("ManagerApp", { screen: "Inicio" });
+    } else {
+      navigation.replace("EmployeeApp", {
+        screen: "Home",
+        params: { nomeUsuario },
+      });
     }
   };
 
