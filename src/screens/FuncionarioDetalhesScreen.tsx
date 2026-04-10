@@ -135,7 +135,7 @@ function FuncionarioDetalhesScreen(
 
   try {
     const { data } = await api.get(
-      `/api/gerencia/funcionarios/buscar-cpf/${digits}`,
+      `/api/gerencia/cpf-buscar?cpf=${digits}`,
     );
     if (data && data.id !== funcionarioId) return "duplicado";
     return "ok";
@@ -163,7 +163,7 @@ function FuncionarioDetalhesScreen(
     if (cpfDigitos && cpfDigitos !== cpfAtualDigitos) {
   try {
     const { data } = await api.get(
-      `/api/gerencia/funcionarios/buscar-cpf/${cpfDigitos}`,
+      `/api/gerencia/cpf-buscar?cpf=${cpfDigitos}`,
     );
     if (data && data.id !== funcionarioId) {
       Alert.alert("Erro", "Ja existe um funcionario cadastrado com este CPF.");

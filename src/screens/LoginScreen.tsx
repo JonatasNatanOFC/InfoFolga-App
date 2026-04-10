@@ -106,10 +106,8 @@ const LoginScreen: React.FC<AuthScreenProps<"Login">> = ({ navigation }) => {
       let errorMessage = "Não foi possível conectar ao servidor.";
 
       if (error?.isAxiosError && error?.response) {
-        if (error.response.status === 401) {
+        if (error.response.status === 401 || error.response.status === 403) {
           errorMessage = "CPF ou senha inválidos.";
-        } else if (error.response.status === 403) {
-          errorMessage = "Você não tem permissão para acessar.";
         } else {
           errorMessage = `Erro do servidor: ${error.response.status}.`;
         }

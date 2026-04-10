@@ -1,37 +1,30 @@
 import axios from "axios";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
-export interface LoginRequest {
-  cpf: string;
-  senha: string;
-}
+const BASE_URL = "http://192.168.0.194:8080";
 
-const getBaseURL = () => {
-  if (__DEV__) {
-    return process.env.EXPO_PUBLIC_API_URL || "http://192.168.0.194:8080";
-  }
-  return "https://api.sisacesso.com.br";
-};
+// Rotas públicas que NÃO devem receber o token de autenticação
+const PUBLIC_ROUTES = ["/api/auth/login", "/api/auth/register"];
 
 const api = axios.create({
-  baseURL: getBaseURL(),
+  baseURL: BASE_URL,
   timeout: 10000,
 });
 
 api.interceptors.request.use(
   async (config) => {
-    const token = await AsyncStorage.getItem("userToken");
+    const isPublicRoute = PUBLIC_ROUTES.some((route) =>
+      config.url?.includes(route),
+    );
 
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
+    if (!isPublicRoute) {
+      const token = await AsyncStorage.getItem("userToken");
+      if (token) {
+        config.headers.Authorization = `Bearer ${token}`;
+      }
     }
 
-    const fullUrl = `${config.baseURL ?? ""}${config.url ?? ""}`;
-
-    console.log("URL:", fullUrl);
-    console.log("TOKEN NA REQUISIÇÃO:", token);
-    console.log("AUTH HEADER:", config.headers?.Authorization);
-
+    console.log(`[API] ${config.method?.toUpperCase()} ${BASE_URL}${config.url}`);
     return config;
   },
   (error) => Promise.reject(error),
@@ -40,11 +33,10 @@ api.interceptors.request.use(
 api.interceptors.response.use(
   (response) => response,
   async (error) => {
-    console.log("AXIOS ERROR STATUS:", error?.response?.status);
-    console.log("AXIOS ERROR DATA:", error?.response?.data);
-    console.log("AXIOS ERROR MESSAGE:", error?.message);
-
     const status = error?.response?.status;
+    if (status !== 404) {
+      console.log(`[API] ERRO ${status}:`, error?.response?.data ?? error?.message);
+    }
 
     if (status === 401) {
       await AsyncStorage.removeItem("userToken");
@@ -67,11 +59,9 @@ export const setAuthToken = async (token: string | null) => {
 
 export const loadStoredToken = async () => {
   const token = await AsyncStorage.getItem("userToken");
-
   if (token) {
     api.defaults.headers.common.Authorization = `Bearer ${token}`;
   }
-
   return token;
 };
 

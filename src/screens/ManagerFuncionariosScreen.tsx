@@ -178,7 +178,7 @@ function ManagerFuncionariosScreen(props: any): React.ReactElement {
   if (!validarCpf(digits)) return "invalido";
 
   try {
-    await api.get(`/api/gerencia/funcionarios/buscar-cpf/${digits}`);
+    await api.get(`/api/gerencia/cpf-buscar?cpf=${digits}`);
     return "duplicado";
   } catch (e: any) {
     if (e?.response?.status === 404) return "ok";
@@ -201,7 +201,7 @@ function ManagerFuncionariosScreen(props: any): React.ReactElement {
 
     if (cpfDigitos) {
   try {
-    await api.get(`/api/gerencia/funcionarios/buscar-cpf/${cpfDigitos}`);
+    await api.get(`/api/gerencia/cpf-buscar?cpf=${cpfDigitos}`);
     Alert.alert("Erro", "Ja existe um funcionario cadastrado com este CPF.");
     return;
   } catch (e: any) {
