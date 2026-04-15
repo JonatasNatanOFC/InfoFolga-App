@@ -13,7 +13,7 @@ import {
   KeyboardAvoidingView,
   Keyboard,
 } from "react-native";
-import { Ionicons } from "@expo/vector-icons";
+import Ionicons from "@expo/vector-icons/Ionicons";
 import { formatCpf } from "../utils/cpf";
 
 export interface FuncionarioForm {
@@ -32,6 +32,7 @@ export interface FuncionarioField {
   label: string;
   placeholder: string;
   secure: boolean;
+  required?: boolean;
 }
 
 const statusConfig: Record<string, { label: string; color: string }> = {
@@ -156,7 +157,10 @@ function FuncionarioModal({
               {/* Campos */}
               {fields.map((field) => (
                 <View key={field.key} style={styles.inputGroup}>
-                  <Text style={styles.inputLabel}>{field.label}</Text>
+                  <Text style={styles.inputLabel}>
+                    {field.label}
+                    {field.required && <Text style={styles.requiredMark}> *</Text>}
+                  </Text>
 
                   <View style={field.key === "cpf" ? styles.cpfRow : undefined}>
                     <TextInput
@@ -188,6 +192,10 @@ function FuncionarioModal({
                             setCpfStatus(result);
                             setCheckingCpf(false);
                           }
+                        } else if (field.key === "nome") {
+                          // Capitaliza a primeira letra de cada palavra
+                          const capitalized = v.replace(/\b\w/g, (c) => c.toUpperCase());
+                          onChangeForm({ ...form, nome: capitalized });
                         } else {
                           onChangeForm({ ...form, [field.key]: v });
                         }
@@ -325,6 +333,10 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: "#e6a817",
     marginTop: 4,
+  },
+  requiredMark: {
+    color: "#dc3545",
+    fontWeight: "bold",
   },
   saveBtn: {
     backgroundColor: "#007bff",

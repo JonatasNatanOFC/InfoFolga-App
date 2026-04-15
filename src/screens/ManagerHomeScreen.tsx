@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useCallback } from "react";
 import {
   View,
   Text,
@@ -15,7 +15,8 @@ import AppHeader from "../components/AppHeader";
 import QuickActionButton from "../components/QuickActionButton";
 import api from "../services/api";
 import { ManagerTabScreenProps } from "../navigation/types";
-import AsyncStorage from "@react-native-async-storage/async-storage";
+import { useFocusEffect } from "@react-navigation/native";
+import { useAuth } from "../hooks/useAuth";
 
 interface DashboardStats {
   pendingRequests: number;
@@ -32,6 +33,8 @@ const ManagerHomeScreen: React.FC<ManagerTabScreenProps<"Inicio">> = ({
   navigation,
 }) => {
   const insets = useSafeAreaInsets();
+  const { logout } = useAuth();
+
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [userName, setUserName] = useState("A carregar...");
 
@@ -46,21 +49,24 @@ const ManagerHomeScreen: React.FC<ManagerTabScreenProps<"Inicio">> = ({
     } catch (error) {
       console.warn("Erro ao carregar dados iniciais:", error);
       Alert.alert("Erro", "Não foi possível carregar os dados do painel.");
-      setStats({ pendingRequests: 0, totalEmployees: 0, approvedLast30Days: 0, rejectedLast30Days: 0 });
+      setStats({
+        pendingRequests: 0,
+        totalEmployees: 0,
+        approvedLast30Days: 0,
+        rejectedLast30Days: 0,
+      });
       setUserName("Gerente");
     }
   };
 
-  useEffect(() => {
-    loadInitialData();
-  }, []);
+  useFocusEffect(
+    useCallback(() => {
+      loadInitialData();
+    }, []),
+  );
 
   const handleLogout = async () => {
-    await AsyncStorage.removeItem("userToken");
-    navigation.getParent()?.reset({
-      index: 0,
-      routes: [{ name: "Auth" }],
-    });
+    await logout();
   };
 
   if (!stats) {
@@ -123,7 +129,11 @@ const ManagerHomeScreen: React.FC<ManagerTabScreenProps<"Inicio">> = ({
           <QuickActionButton
             icon="person-add-outline"
             label="Gerenciar Funcionários"
-            onPress={() => navigation.jumpTo("Funcionarios", { screen: "FuncionariosList" })}
+            onPress={() =>
+              navigation.jumpTo("Funcionarios", {
+                screen: "FuncionariosList",
+              })
+            }
             color="#17a2b8"
           />
           <QuickActionButton
@@ -162,6 +172,5 @@ const styles = StyleSheet.create({
     marginTop: 10,
   },
 });
-
 
 export default ManagerHomeScreen;

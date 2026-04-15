@@ -1,9 +1,9 @@
-import {
+import type {
   NavigatorScreenParams,
   CompositeScreenProps,
 } from "@react-navigation/native";
-import { StackScreenProps } from "@react-navigation/stack";
-import { BottomTabScreenProps } from "@react-navigation/bottom-tabs";
+import type { StackScreenProps } from "@react-navigation/stack";
+import type { BottomTabScreenProps } from "@react-navigation/bottom-tabs";
 
 export type AuthStackParamList = {
   Login: undefined;
@@ -40,17 +40,17 @@ export type AppStackParamList = {
 export type AuthScreenProps<T extends keyof AuthStackParamList> =
   CompositeScreenProps<
     StackScreenProps<AuthStackParamList, T>,
-    StackScreenProps<AppStackParamList>
+    StackScreenProps<AppStackParamList, "Auth">
   >;
 
 export type ManagerTabScreenProps<T extends keyof ManagerTabParamList> =
   CompositeScreenProps<
     BottomTabScreenProps<ManagerTabParamList, T>,
-    StackScreenProps<AppStackParamList>
+    StackScreenProps<AppStackParamList, "ManagerApp">
   >;
 
 export type EmployeeTabScreenProps<T extends keyof EmployeeTabParamList> =
   CompositeScreenProps<
     BottomTabScreenProps<EmployeeTabParamList, T>,
-    StackScreenProps<AppStackParamList>
+    StackScreenProps<AppStackParamList, "EmployeeApp">
   >;

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import {
   View,
   Text,
@@ -10,27 +10,17 @@ import {
   Platform,
   Keyboard,
 } from "react-native";
-import { AuthScreenProps } from "../navigation/types";
-import api, { setAuthToken } from "../services/api";
 import { Ionicons } from "@expo/vector-icons";
 import { StatusBar } from "expo-status-bar";
-
-interface LoginRequest {
-  cpf: string;
-  senha: string;
-}
-
-interface LoginResponse {
-  token: string;
-  nomeUsuario: string;
-  role: "ROLE_GERENTE" | "ROLE_FUNCIONARIO";
-}
+import { AuthScreenProps } from "../navigation/types";
+import { useAuth } from "../hooks/useAuth";
 
 const LoginScreen: React.FC<AuthScreenProps<"Login">> = ({ navigation }) => {
-  const [cpf, setCpf] = useState<string>("");
-  const [senha, setSenha] = useState<string>("");
-  const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [cpf, setCpf] = useState("");
+  const [senha, setSenha] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
   const [keyboardOpen, setKeyboardOpen] = useState(false);
+  const { login, setRole } = useAuth();
 
   useEffect(() => {
     const showSub = Keyboard.addListener(
@@ -48,15 +38,15 @@ const LoginScreen: React.FC<AuthScreenProps<"Login">> = ({ navigation }) => {
     };
   }, []);
 
-  const formatCpf = (value: string) => {
+  function formatCpf(value: string) {
     const digits = value.replace(/\D/g, "").slice(0, 11);
     return digits
       .replace(/(\d{3})(\d)/, "$1.$2")
       .replace(/(\d{3})(\d)/, "$1.$2")
       .replace(/(\d{3})(\d{1,2})$/, "$1-$2");
-  };
+  }
 
-  const handleLogin = async () => {
+  async function handleLogin() {
     const cpfDigits = cpf.replace(/\D/g, "");
 
     if (cpfDigits.length !== 11 || !senha) {
@@ -66,59 +56,38 @@ const LoginScreen: React.FC<AuthScreenProps<"Login">> = ({ navigation }) => {
 
     setIsLoading(true);
 
-    // Usa .then/.catch para NUNCA rejeitar a promise externamente.
-    // O try/catch padrão em modo dev do Expo pode deixar o overlay aparecer
-    // antes de capturar o erro; este padrão evita isso completamente.
-    const result = await api
-      .post<LoginResponse>("/api/auth/login", { cpf: cpfDigits, senha })
-      .then((response) => ({ ok: true as const, data: response.data }))
-      .catch((error: any) => ({ ok: false as const, error }));
-
-    setIsLoading(false);
-
-    if (!result.ok) {
-      const error = result.error;
+    try {
+      const result = await login(cpfDigits, senha);
+      setRole(result.role);
+    } catch (error: any) {
       let errorMessage = "Não foi possível conectar ao servidor.";
 
       if (error?.isAxiosError && error?.response) {
         const backMessage =
           typeof error.response.data === "string"
             ? error.response.data
-            : error.response.data?.message ?? error.response.data?.erro;
+            : (error.response.data?.message ?? error.response.data?.erro);
 
         if (backMessage) {
           errorMessage = backMessage;
-        } else if (error.response.status === 401 || error.response.status === 403) {
+        } else if (
+          error.response.status === 401 ||
+          error.response.status === 403
+        ) {
           errorMessage = "CPF ou senha inválidos.";
         } else {
           errorMessage = `Erro do servidor (${error.response.status}).`;
         }
       } else if (error?.isAxiosError && error?.request) {
-        errorMessage = "Erro de rede. Verifique sua conexão e se o servidor está acessível.";
+        errorMessage =
+          "Erro de rede. Verifique sua conexão e se o servidor está acessível.";
       }
 
       Alert.alert("Erro no Login", errorMessage);
-      return;
+    } finally {
+      setIsLoading(false);
     }
-
-    const { token, nomeUsuario, role } = result.data;
-
-    if (!token) {
-      Alert.alert("Erro de Login", "A resposta do servidor não incluiu um token.");
-      return;
-    }
-
-    await setAuthToken(token);
-
-    if (role === "ROLE_GERENTE") {
-      navigation.replace("ManagerApp", { screen: "Inicio" });
-    } else {
-      navigation.replace("EmployeeApp", {
-        screen: "Home",
-        params: { nomeUsuario },
-      });
-    }
-  };
+  }
 
   return (
     <View
@@ -137,72 +106,53 @@ const LoginScreen: React.FC<AuthScreenProps<"Login">> = ({ navigation }) => {
 
       <View style={styles.form}>
         <TextInput
-          style={styles.input}
           placeholder="CPF"
-          value={cpf}
-          onChangeText={(text) => setCpf(formatCpf(text))}
           keyboardType="numeric"
-          editable={!isLoading}
-          placeholderTextColor="#888"
-          maxLength={14}
-        />
-
-        <TextInput
+          value={cpf}
+          onChangeText={(v) => setCpf(formatCpf(v))}
           style={styles.input}
+        />
+        <TextInput
           placeholder="Senha"
           secureTextEntry
           value={senha}
           onChangeText={setSenha}
-          editable={!isLoading}
-          placeholderTextColor="#888"
+          style={styles.input}
         />
 
-        {isLoading ? (
-          <ActivityIndicator
-            size="large"
-            color="#007bff"
-            style={{ marginTop: 20 }}
-          />
-        ) : (
-          <TouchableOpacity style={styles.button} onPress={handleLogin}>
+        <TouchableOpacity style={styles.button} onPress={handleLogin} disabled={isLoading}>
+          {isLoading ? (
+            <ActivityIndicator color="#fff" />
+          ) : (
             <Text style={styles.buttonText}>Entrar</Text>
-          </TouchableOpacity>
-        )}
+          )}
+        </TouchableOpacity>
       </View>
     </View>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    justifyContent: "center",
-    backgroundColor: "#f0f2f5",
-    paddingHorizontal: 20,
-  },
-  header: { alignItems: "center", marginBottom: 40 },
-  title: { fontSize: 28, fontWeight: "bold", color: "#333", marginTop: 10 },
-  subtitle: { fontSize: 16, color: "#666", marginTop: 4 },
-  form: { width: "100%" },
+  container: { flex: 1, justifyContent: "center", padding: 24, backgroundColor: "#f5f7fb" },
+  header: { alignItems: "center", marginBottom: 32 },
+  title: { fontSize: 28, fontWeight: "bold", marginTop: 12, color: "#111" },
+  subtitle: { fontSize: 15, color: "#666", marginTop: 6 },
+  form: { gap: 14 },
   input: {
-    height: 50,
     backgroundColor: "#fff",
-    borderColor: "#ddd",
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 14,
     borderWidth: 1,
-    borderRadius: 8,
-    marginBottom: 15,
-    paddingHorizontal: 15,
-    fontSize: 16,
-    color: "#333",
+    borderColor: "#ddd",
   },
   button: {
     backgroundColor: "#007bff",
-    paddingVertical: 15,
-    borderRadius: 8,
+    paddingVertical: 14,
+    borderRadius: 12,
     alignItems: "center",
-    marginTop: 10,
   },
-  buttonText: { color: "#fff", fontSize: 18, fontWeight: "bold" },
+  buttonText: { color: "#fff", fontWeight: "bold", fontSize: 16 },
 });
 
 export default LoginScreen;

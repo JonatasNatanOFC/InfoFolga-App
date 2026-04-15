@@ -1,13 +1,11 @@
 import axios from "axios";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { ENV } from "../config/env";
 
-const BASE_URL = "http://192.168.0.194:8080";
-
-// Rotas públicas que NÃO devem receber o token de autenticação
-const PUBLIC_ROUTES = ["/api/auth/login", "/api/auth/register"];
+const PUBLIC_ROUTES = ["/api/auth/login"];
 
 const api = axios.create({
-  baseURL: BASE_URL,
+  baseURL: ENV.API_URL,
   timeout: 10000,
 });
 
@@ -19,26 +17,47 @@ api.interceptors.request.use(
 
     if (!isPublicRoute) {
       const token = await AsyncStorage.getItem("userToken");
+      console.log(`[API REQUEST] Procurando token para: ${config.url}`);
+      console.log(`[API REQUEST] Token encontrado: ${!!token}`);
       if (token) {
         config.headers.Authorization = `Bearer ${token}`;
+        console.log(
+          `[API REQUEST] ✅ Token adicionado ao header para ${config.url}`,
+        );
+      } else {
+        console.warn(
+          `[API REQUEST] ❌ AVISO: Token NÃO encontrado para rota ${config.url}`,
+        );
       }
     }
 
-    console.log(`[API] ${config.method?.toUpperCase()} ${BASE_URL}${config.url}`);
+    console.log(
+      `[API REQUEST] ${config.method?.toUpperCase()} ${ENV.API_URL}${config.url}`,
+    );
+
     return config;
   },
   (error) => Promise.reject(error),
 );
 
 api.interceptors.response.use(
-  (response) => response,
+  (response) => {
+    console.log(
+      `[API RESPONSE] ✅ Status ${response.status} - ${response.config.url}`,
+    );
+    return response;
+  },
   async (error) => {
     const status = error?.response?.status;
-    if (status !== 404) {
-      console.log(`[API] ERRO ${status}:`, error?.response?.data ?? error?.message);
-    }
+    console.log(`[API RESPONSE] ❌ Erro ${status} - ${error?.config?.url}`);
+    console.log(
+      "[API ERROR]:",
+      status,
+      error?.response?.data ?? error?.message,
+    );
 
     if (status === 401) {
+      console.log("[API] 401 - Limpando token...");
       await AsyncStorage.removeItem("userToken");
       delete api.defaults.headers.common.Authorization;
     }
@@ -47,7 +66,7 @@ api.interceptors.response.use(
   },
 );
 
-export const setAuthToken = async (token: string | null) => {
+export async function setAuthToken(token: string | null) {
   if (token) {
     await AsyncStorage.setItem("userToken", token);
     api.defaults.headers.common.Authorization = `Bearer ${token}`;
@@ -55,14 +74,16 @@ export const setAuthToken = async (token: string | null) => {
     await AsyncStorage.removeItem("userToken");
     delete api.defaults.headers.common.Authorization;
   }
-};
+}
 
-export const loadStoredToken = async () => {
+export async function loadStoredToken() {
   const token = await AsyncStorage.getItem("userToken");
+
   if (token) {
     api.defaults.headers.common.Authorization = `Bearer ${token}`;
   }
+
   return token;
-};
+}
 
 export default api;
