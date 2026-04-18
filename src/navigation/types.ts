@@ -21,14 +21,10 @@ export type ManagerTabParamList = {
   Relatorios: undefined;
 };
 
-export type FuncionariosStackScreenProps<T extends keyof FuncionariosStackParamList> =
-    CompositeScreenProps<
-      StackScreenProps<FuncionariosStackParamList, T>,
-      ManagerTabScreenProps<"Funcionarios">
-    >;
-
 export type EmployeeTabParamList = {
-  Home: { nomeUsuario: string };
+  Home: undefined;
+  NovaSolicitacao: undefined;
+  MinhasSolicitacoes: undefined;
 };
 
 export type AppStackParamList = {
@@ -54,3 +50,10 @@ export type EmployeeTabScreenProps<T extends keyof EmployeeTabParamList> =
     BottomTabScreenProps<EmployeeTabParamList, T>,
     StackScreenProps<AppStackParamList, "EmployeeApp">
   >;
+
+export type FuncionariosStackScreenProps<
+  T extends keyof FuncionariosStackParamList,
+> = CompositeScreenProps<
+  StackScreenProps<FuncionariosStackParamList, T>,
+  ManagerTabScreenProps<"Funcionarios">
+>;

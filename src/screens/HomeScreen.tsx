@@ -18,8 +18,6 @@ import { EmployeeTabScreenProps } from "../navigation/types";
 import { useAuth } from "../hooks/useAuth";
 import api from "../services/api";
 
-// ─── Tipos ────────────────────────────────────────────────────────────────────
-
 interface MeuPerfil {
   nome: string;
   cargo: string;
@@ -35,8 +33,6 @@ interface MinhasStats {
   solicitacoesRejeitadas: number;
   diasDeFolgaUsados: number;
 }
-
-// ─── Helpers ──────────────────────────────────────────────────────────────────
 
 const STATUS_CONFIG: Record<
   string,
@@ -64,7 +60,10 @@ function primeiroNome(nome?: string): string {
   return nome.trim().split(" ")[0];
 }
 
-function montarUrlFoto(foto: string | null | undefined): string | null {
+function montarUrlFoto(
+  baseURL: string,
+  foto: string | null | undefined,
+): string | null {
   if (!foto) return null;
 
   const fotoTratada = foto.trim();
@@ -78,18 +77,12 @@ function montarUrlFoto(foto: string | null | undefined): string | null {
     return fotoTratada;
   }
 
-  const baseURL = api.defaults.baseURL || "";
-
-  if (!baseURL) return fotoTratada;
-
   if (fotoTratada.startsWith("/")) {
     return `${baseURL}${fotoTratada}`;
   }
 
   return `${baseURL}/${fotoTratada}`;
 }
-
-// ─── Componente ───────────────────────────────────────────────────────────────
 
 const HomeScreen: React.FC<EmployeeTabScreenProps<"Home">> = ({
   navigation,
@@ -102,40 +95,28 @@ const HomeScreen: React.FC<EmployeeTabScreenProps<"Home">> = ({
   const [loading, setLoading] = useState(true);
   const [fotoErro, setFotoErro] = useState(false);
 
-  const carregar = async () => {
+  const carregar = useCallback(async () => {
     setLoading(true);
     setFotoErro(false);
 
     try {
-      const perfilPromise = api.get<MeuPerfil>("/api/funcionarios/me");
-      const statsPromise = api.get<MinhasStats>("/api/funcionarios/me/stats");
-
-      const [perfilRes, statsRes] = await Promise.allSettled([
-        perfilPromise,
-        statsPromise,
+      const [perfilRes, statsRes] = await Promise.all([
+        api.get<MeuPerfil>("/api/funcionarios/me"),
+        api.get<MinhasStats>("/api/funcionarios/me/stats"),
       ]);
 
-      if (perfilRes.status === "fulfilled") {
-        console.log("PERFIL:", perfilRes.value.data);
-        setPerfil(perfilRes.value.data);
-      } else {
-        console.log("ERRO PERFIL:", perfilRes.reason);
-      }
+      setPerfil(perfilRes.data);
+      setStats(statsRes.data);
+    } catch (error: any) {
+      console.log(
+        "ERRO AO CARREGAR HOME:",
+        error?.response?.data || error?.message,
+      );
 
-      if (statsRes.status === "fulfilled") {
-        console.log("STATS:", statsRes.value.data);
-        setStats(statsRes.value.data);
-      } else {
-        console.log("ERRO STATS:", statsRes.reason);
-        setStats({
-          solicitacoesPendentes: 0,
-          solicitacoesAprovadas: 0,
-          solicitacoesRejeitadas: 0,
-          diasDeFolgaUsados: 0,
-        });
-      }
-    } catch (error) {
-      console.log("ERRO GERAL AO CARREGAR HOME:", error);
+      Alert.alert(
+        "Erro",
+        "Não foi possível carregar os dados da home do funcionário.",
+      );
 
       setStats({
         solicitacoesPendentes: 0,
@@ -146,12 +127,12 @@ const HomeScreen: React.FC<EmployeeTabScreenProps<"Home">> = ({
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   useFocusEffect(
     useCallback(() => {
       carregar();
-    }, []),
+    }, [carregar]),
   );
 
   const handleLogout = async () => {
@@ -171,7 +152,7 @@ const HomeScreen: React.FC<EmployeeTabScreenProps<"Home">> = ({
   const setor = perfil?.setor?.trim() || "";
   const status = perfil?.status?.toLowerCase?.() || "ativo";
   const stCfg = STATUS_CONFIG[status] ?? STATUS_CONFIG.ativo;
-  const fotoUrl = montarUrlFoto(perfil?.foto);
+  const fotoUrl = montarUrlFoto(api.defaults.baseURL || "", perfil?.foto);
   const mostrarFoto = !!fotoUrl && !fotoErro;
 
   return (
@@ -187,10 +168,7 @@ const HomeScreen: React.FC<EmployeeTabScreenProps<"Home">> = ({
             <Image
               source={{ uri: fotoUrl }}
               style={styles.avatarImage}
-              onError={() => {
-                console.log("ERRO AO CARREGAR FOTO:", fotoUrl);
-                setFotoErro(true);
-              }}
+              onError={() => setFotoErro(true)}
             />
           ) : (
             <View style={styles.avatar}>
@@ -280,31 +258,24 @@ const HomeScreen: React.FC<EmployeeTabScreenProps<"Home">> = ({
 
         <ActionRow
           icon="add-circle-outline"
-          label="Nova Solicitação de Folga"
-          sublabel="Peça um dia de folga ou férias"
+          label="Nova Solicitação"
+          sublabel="Peça folga ou férias"
           color="#007bff"
-          onPress={() =>
-            Alert.alert(
-              "Em breve",
-              "Tela de nova solicitação em desenvolvimento.",
-            )
-          }
+          onPress={() => navigation.navigate("NovaSolicitacao")}
         />
 
         <ActionRow
           icon="list-outline"
           label="Minhas Solicitações"
-          sublabel="Veja o histórico e status"
+          sublabel="Veja histórico e status"
           color="#6f42c1"
-          onPress={() =>
-            Alert.alert("Em breve", "Tela de histórico em desenvolvimento.")
-          }
+          onPress={() => navigation.navigate("MinhasSolicitacoes")}
         />
 
         <ActionRow
           icon="person-outline"
           label="Meu Perfil"
-          sublabel="Veja seus dados cadastrais"
+          sublabel="Visualize seus dados"
           color="#17a2b8"
           onPress={() =>
             Alert.alert("Em breve", "Tela de perfil em desenvolvimento.")
@@ -314,8 +285,6 @@ const HomeScreen: React.FC<EmployeeTabScreenProps<"Home">> = ({
     </View>
   );
 };
-
-// ─── Sub-componentes ──────────────────────────────────────────────────────────
 
 function StatBox({
   value,
@@ -377,7 +346,7 @@ function ActionRow({
   );
 }
 
-// ─── Styles ───────────────────────────────────────────────────────────────────
+export default HomeScreen;
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#f0f2f5" },
@@ -427,80 +396,85 @@ const styles = StyleSheet.create({
   },
 
   avatarText: {
-    fontSize: 22,
-    fontWeight: "bold",
     color: "#fff",
+    fontWeight: "bold",
+    fontSize: 20,
   },
 
   saudacao: {
+    color: "rgba(255,255,255,0.85)",
     fontSize: 13,
-    color: "rgba(255,255,255,0.8)",
   },
 
   heroNome: {
-    fontSize: 20,
-    fontWeight: "bold",
     color: "#fff",
+    fontSize: 24,
+    fontWeight: "bold",
   },
 
   heroCargo: {
-    fontSize: 12,
-    color: "rgba(255,255,255,0.75)",
     marginTop: 2,
+    color: "rgba(255,255,255,0.9)",
+    fontSize: 13,
   },
 
   logoutBtn: {
-    padding: 8,
-    backgroundColor: "rgba(255,255,255,0.15)",
-    borderRadius: 20,
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "rgba(255,255,255,0.18)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.28)",
   },
 
   statusBadge: {
+    alignSelf: "flex-start",
     flexDirection: "row",
     alignItems: "center",
-    alignSelf: "flex-start",
     gap: 6,
-    paddingHorizontal: 12,
-    paddingVertical: 5,
-    borderRadius: 20,
     borderWidth: 1,
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
   },
 
   statusText: {
-    fontSize: 13,
-    fontWeight: "bold",
+    fontWeight: "600",
+    fontSize: 12,
   },
 
   scroll: {
-    padding: 20,
-    paddingBottom: 40,
+    padding: 18,
+    paddingBottom: 28,
   },
 
   sectionTitle: {
-    fontSize: 16,
+    fontSize: 17,
     fontWeight: "bold",
-    color: "#333",
-    marginBottom: 12,
-    marginTop: 4,
+    color: "#111",
+    marginBottom: 14,
   },
 
   statsGrid: {
     flexDirection: "row",
-    gap: 10,
-    marginBottom: 12,
+    flexWrap: "wrap",
+    gap: 12,
+    marginBottom: 18,
   },
 
   statBox: {
-    flex: 1,
+    flexGrow: 1,
+    minWidth: "30%",
     backgroundColor: "#fff",
-    borderRadius: 12,
+    borderRadius: 16,
     padding: 14,
-    alignItems: "center",
-    elevation: 2,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.08,
     shadowRadius: 3,
+    elevation: 2,
   },
 
   statValue: {
@@ -509,75 +483,78 @@ const styles = StyleSheet.create({
   },
 
   statLabel: {
-    fontSize: 11,
-    color: "#888",
-    marginTop: 2,
-    textAlign: "center",
+    marginTop: 4,
+    color: "#666",
+    fontSize: 12,
   },
 
   diasCard: {
+    backgroundColor: "#fff",
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 22,
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#fff",
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 20,
-    elevation: 2,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.08,
     shadowRadius: 3,
-    gap: 14,
+    elevation: 2,
   },
 
   diasIcon: {
-    padding: 14,
-    borderRadius: 12,
+    width: 52,
+    height: 52,
+    borderRadius: 14,
+    justifyContent: "center",
+    alignItems: "center",
+    marginRight: 14,
   },
 
   diasValue: {
-    fontSize: 26,
+    fontSize: 24,
     fontWeight: "bold",
-    color: "#17a2b8",
+    color: "#111",
   },
 
   diasLabel: {
-    fontSize: 13,
-    color: "#888",
     marginTop: 2,
+    fontSize: 13,
+    color: "#666",
   },
 
   actionRow: {
+    backgroundColor: "#fff",
+    borderRadius: 16,
+    padding: 14,
+    marginBottom: 12,
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#fff",
-    borderRadius: 12,
-    padding: 14,
-    marginBottom: 10,
-    elevation: 2,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.08,
     shadowRadius: 3,
-    gap: 14,
+    elevation: 2,
   },
 
   actionIcon: {
-    padding: 10,
-    borderRadius: 10,
+    width: 44,
+    height: 44,
+    borderRadius: 12,
+    justifyContent: "center",
+    alignItems: "center",
+    marginRight: 12,
   },
 
   actionLabel: {
     fontSize: 15,
-    fontWeight: "600",
+    fontWeight: "700",
     color: "#222",
   },
 
   actionSub: {
-    fontSize: 12,
-    color: "#888",
     marginTop: 2,
+    fontSize: 12,
+    color: "#777",
   },
 });
-
-export default HomeScreen;

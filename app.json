@@ -32,7 +32,8 @@
           "photosPermission": "Permitir acesso a galeria para adicionar foto do funcionario",
           "cameraPermission": "Permitir acesso a camera para tirar foto do funcionario"
         }
-      ]
+      ],
+      "@react-native-community/datetimepicker"
     ]
   }
 }
